@@ -180,7 +180,7 @@
   </template>
   
   <script setup>
-  import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
+  import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue'
   import { useRouter } from 'vue-router'
   import { initializeFirebase } from '~/firebase'
   import { useAuth } from '~/composables/useAuth'

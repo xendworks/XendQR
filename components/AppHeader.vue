@@ -105,21 +105,19 @@
   <script setup>
   import { ref, onMounted } from 'vue'
   import { useRouter } from 'vue-router'
-  import { useFirebaseAuth, initializeFirebase } from '~/firebase'
+  import { initializeFirebase } from '~/firebase'
+  import { useAuth } from '~/composables/useAuth'
   
   const router = useRouter()
   const isMenuOpen = ref(false)
   
-  // Get Firebase authentication state
-  const { user, isAuthenticated, isAdmin, isLoading } = useFirebaseAuth()
+  // Get auth state using the useAuth composable
+  const { user, isAuthenticated, isAdmin, isLoading, logout: authLogout } = useAuth()
   
   // Handle user logout
   const logout = async () => {
     try {
-      const { auth } = initializeFirebase()
-      const { signOut } = await import('firebase/auth')
-      
-      await signOut(auth)
+      await authLogout()
       isMenuOpen.value = false
       
       // Redirect to home page
