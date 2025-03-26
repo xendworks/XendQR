@@ -190,14 +190,17 @@
 import { ref, onMounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { initializeFirebase, handleFirebaseError } from '~/firebase'
+import { useAuth } from '~/composables/useAuth'
 import AdminLogin from '~/components/AdminLogin.vue'
 import QrCodeScanner from '~/components/QrCodeScanner.vue'
 
 // Router
 const router = useRouter()
 
+// Auth composable
+const { user, isAuthenticated, isAdmin, isLoading, logout } = useAuth()
+
 // Component state
-const isAuthenticated = ref(false)
 const adminData = ref(null)
 const scannerRef = ref(null)
 const scannerError = ref('')
@@ -217,7 +220,6 @@ const { auth, db } = initializeFirebase()
 
 // Handle admin login
 const onAdminLogin = (data) => {
-  isAuthenticated.value = true
   adminData.value = data.adminData
   
   // Fetch recent check-ins after login
@@ -453,23 +455,6 @@ const showAllAttendees = () => {
   router.push('/admin/attendees')
 }
 
-// Sign out
-const logout = async () => {
-  try {
-    const { signOut } = await import('firebase/auth')
-    await signOut(auth)
-    
-    isAuthenticated.value = false
-    adminData.value = null
-    lastScanResult.value = null
-    recentCheckins.value = []
-    
-  } catch (error) {
-    console.error('Logout error:', error)
-    scannerError.value = handleFirebaseError(error)
-  }
-}
-
 // Helper functions
 const getInitials = (name) => {
   if (!name) return '?'
@@ -499,23 +484,12 @@ const formatDateTime = (date) => {
 
 // Check authentication on mount
 onMounted(() => {
-  import('firebase/auth').then(({ onAuthStateChanged }) => {
+  // Initialize Firebase
+  initializeFirebase();
   
-  onAuthStateChanged(auth, async (user) => {
-    if (user) {
-      // Check if user is an admin
-      const { getDoc, doc } = await import('firebase/firestore')
-      const adminDoc = await getDoc(doc(db, 'admins', user.uid))
-      
-      if (adminDoc.exists()) {
-        isAuthenticated.value = true
-        adminData.value = adminDoc.data()
-        
-        // Fetch recent check-ins
-        fetchRecentCheckins()
-      }
-    }
-  })
-})
+  // If authenticated and admin, fetch recent check-ins
+  if (isAuthenticated.value && isAdmin.value) {
+    fetchRecentCheckins();
+  }
 })
 </script>

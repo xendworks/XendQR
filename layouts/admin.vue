@@ -59,7 +59,7 @@
                     Signed in as <span class="font-medium">{{ adminEmail }}</span>
                   </div>
                   <button
-                    @click="logout"
+                    @click="handleLogout"
                     class="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
                   >
                     Sign out
@@ -144,7 +144,7 @@
             </div>
             <div class="mt-3 space-y-1">
               <button
-                @click="logout"
+                @click="handleLogout"
                 class="block w-full text-left px-4 py-2 text-base font-medium text-indigo-200 hover:text-white hover:bg-indigo-700"
               >
                 Sign out
@@ -183,7 +183,7 @@
   import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
   import { useRouter } from 'vue-router'
   import { initializeFirebase } from '~/firebase'
-  import useAuth from '~/composables/useAuth'
+  import { useAuth } from '~/composables/useAuth'
   import AdminLogin from '~/components/AdminLogin.vue'
   
   // Router
