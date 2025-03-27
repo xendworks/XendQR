@@ -245,17 +245,48 @@
   
   // Start scanning for QR codes
   const startScanning = () => {
-    // Import jsQR dynamically
-    import('jsqr').then(({ default: jsQR }) => {
-      // Create canvas for processing video frames
-      const canvas = document.createElement('canvas')
-      const ctx = canvas.getContext('2d')
-      
-      // Clear any existing scan interval
-      if (scanIntervalId.value) {
-        clearInterval(scanIntervalId.value)
-      }
-      
+    // Create canvas for processing video frames
+    const canvas = document.createElement('canvas')
+    const ctx = canvas.getContext('2d')
+    
+    // Clear any existing scan interval
+    if (scanIntervalId.value) {
+      clearInterval(scanIntervalId.value)
+    }
+
+    // Load jsQR using a script tag for direct browser access
+    const loadJsQR = () => {
+      return new Promise((resolve, reject) => {
+        // Check if jsQR is already loaded
+        if (window.jsQR) {
+          resolve(window.jsQR);
+          return;
+        }
+
+        // Create script element to load jsQR
+        const script = document.createElement('script');
+        script.src = '/js/jsQR.js';
+        script.async = true;
+        
+        script.onload = () => {
+          if (window.jsQR) {
+            resolve(window.jsQR);
+          } else {
+            reject(new Error('jsQR loaded but not available as window.jsQR'));
+          }
+        };
+        
+        script.onerror = () => {
+          reject(new Error('Failed to load jsQR script'));
+        };
+        
+        // Add script to document
+        document.head.appendChild(script);
+      });
+    };
+    
+    // Load and use jsQR
+    loadJsQR().then(jsQRFunc => {
       // Set up scan interval
       scanIntervalId.value = setInterval(() => {
         if (!video.value || !isScanning.value || video.value.paused || video.value.ended) {
@@ -272,29 +303,35 @@
         // Get image data for QR code detection
         const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height)
         
-        // Process image data with jsQR
-        const code = jsQR(imageData.data, imageData.width, imageData.height, {
-          inversionAttempts: 'dontInvert'
-        })
-        
-        // If QR code found
-        if (code) {
-          // Play success sound or vibration if available
-          if (navigator.vibrate) {
-            navigator.vibrate(100)
+        try {
+          // Process image data with jsQR
+          const code = jsQRFunc(imageData.data, imageData.width, imageData.height, {
+            inversionAttempts: 'dontInvert'
+          })
+          
+          // If QR code found
+          if (code) {
+            // Play success sound or vibration if available
+            if (navigator.vibrate) {
+              navigator.vibrate(100)
+            }
+            
+            // Update status
+            statusMessage.value = 'QR code detected!'
+            
+            // Emit scan event with decoded data
+            emit('scan', code.data)
+            
+            // Optionally pause scanning for a moment
+            pauseScanning(1000)
           }
-          
-          // Update status
-          statusMessage.value = 'QR code detected!'
-          
-          // Emit scan event with decoded data
-          emit('scan', code.data)
-          
-          // Optionally pause scanning for a moment
-          pauseScanning(1000)
+        } catch (error) {
+          console.error('QR scan error:', error);
+          handleError('QR scan error: ' + error.message)
         }
       }, props.scanInterval)
     }).catch(error => {
+      console.error('Failed to load QR code scanner:', error);
       handleError('Failed to load QR code scanner: ' + error.message)
     })
   }
@@ -346,11 +383,18 @@
     emit('error', message)
   }
   
+  // Method for external pause control
+  const pauseScanner = (duration = 1000) => {
+    pauseScanning(duration)
+  }
+  
   // Expose methods to parent component
   defineExpose({
     startScanner,
     stopScanner,
-    toggleFlash
+    toggleFlash,
+    pauseScanning,
+    pauseScanner
   })
   
   // Lifecycle hooks

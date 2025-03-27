@@ -52,7 +52,7 @@
                   class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium"
                   :class="lastScanResult.checkInStatus ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'"
                 >
-                  {{ lastScanResult.checkInStatus ? 'Already Checked In' : 'Not Checked In' }}
+                  {{ lastScanResult.checkInStatus ? 'Checked In' : 'Not Checked In' }}
                 </span>
                 <span v-if="lastScanResult.checkInTime" class="ml-2 text-xs text-gray-500">
                   at {{ formatDateTime(lastScanResult.checkInTime) }}
@@ -125,7 +125,19 @@
       
       <!-- Recent Check-ins -->
       <div class="bg-white rounded-lg shadow-md p-6">
-        <h2 class="text-lg font-medium text-gray-900 mb-4">Recent Check-ins</h2>
+        <div class="flex justify-between items-center mb-4">
+          <h2 class="text-lg font-medium text-gray-900">Recent Check-ins</h2>
+          <button 
+            @click="fetchRecentCheckins" 
+            class="text-sm text-indigo-600 hover:text-indigo-500 flex items-center"
+            :disabled="isProcessing"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            </svg>
+            Refresh
+          </button>
+        </div>
         
         <div v-if="recentCheckins.length === 0" class="text-center py-4 text-gray-500">
           No recent check-ins
@@ -233,58 +245,212 @@ const onQrScanned = async (qrData) => {
     
     // Pause scanner temporarily
     if (scannerRef.value) {
-      scannerRef.value.pauseScanning(1500)
+      scannerRef.value.pauseScanner(1500)
     }
     
     // Play scan sound
     new Audio('/sounds/scan-beep.mp3').play().catch(() => {})
     
     // Parse QR data
-    let attendeeData
+    let attendeeData;
+    let registrationId;
+    
     try {
-      attendeeData = JSON.parse(qrData)
-    } catch (error) {
-      lastScanResult.value = {
-        isValid: false,
-        message: 'Invalid QR code format',
-        data: qrData
+      // First, try to parse as JSON
+      attendeeData = JSON.parse(qrData);
+      
+      // Check for ID field (most priority)
+      if (attendeeData.id) {
+        registrationId = attendeeData.id;
+      } 
+      // Check if it has regId field
+      else if (attendeeData.regId) {
+        registrationId = attendeeData.regId;
+      } 
+      // Check for registrationId field
+      else if (attendeeData.registrationId) {
+        registrationId = attendeeData.registrationId;
+      } 
+      // If the JSON itself is a string, use that
+      else if (typeof attendeeData === 'string') {
+        registrationId = attendeeData.trim();
       }
-      return
+      else {
+        // No registration ID found in the JSON
+        throw new Error('No registration ID found in QR data');
+      }
+    } catch (error) {
+      // If JSON parsing fails, try using the raw string as registration ID
+      console.log('QR data is not valid JSON, trying as plain text:', qrData);
+      if (qrData && typeof qrData === 'string' && qrData.trim()) {
+        registrationId = qrData.trim();
+        attendeeData = { id: registrationId };
+      } else {
+        lastScanResult.value = {
+          isValid: false,
+          message: 'Invalid QR code format',
+          data: qrData
+        };
+        return;
+      }
     }
     
-    // Validate required fields
-    if (!attendeeData.regId) {
+    // Log what we found
+    console.log('Using registration ID:', registrationId);
+    
+    // Validate registration ID
+    if (!registrationId) {
       lastScanResult.value = {
         isValid: false,
         message: 'Missing registration ID in QR code',
         data: attendeeData
-      }
-      return
+      };
+      return;
     }
+    
+    // If registrationId is a complex object (which can happen when the entire JSON is used), 
+    // convert to string for error display purposes only
+    const displayRegId = typeof registrationId === 'object' 
+      ? JSON.stringify(registrationId) 
+      : registrationId;
     
     // Look up attendee in database
-    const { collection, query, where, getDocs } = await import('firebase/firestore')
+    const { collection, query, where, getDocs, doc, getDoc } = await import('firebase/firestore');
     
-    const attendeesQuery = query(
+    // Log the registration ID being searched
+    console.log('Searching for registration ID:', registrationId);
+    
+    // First try the users collection
+    let querySnapshot = await getDocs(query(
       collection(db, 'users'),
-      where('registrationId', '==', attendeeData.regId)
-    )
+      where('registrationId', '==', registrationId)
+    ));
+    console.log('Users collection query results:', querySnapshot.size);
     
-    const querySnapshot = await getDocs(attendeesQuery)
-    
+    // If not found in users, try the document in attendees collection
     if (querySnapshot.empty) {
-      lastScanResult.value = {
-        isValid: false,
-        message: `No registration found with ID: ${attendeeData.regId}`,
-        registrationId: attendeeData.regId,
-        data: attendeeData
+      console.log('Not found in users collection, trying attendees collection...');
+      
+      // Try looking up directly in attendees collection by document ID
+      try {
+        const docRef = doc(db, 'attendees', registrationId);
+        const docSnap = await getDoc(docRef);
+        
+        if (docSnap.exists()) {
+          console.log('Found document in attendees collection:', docSnap.id);
+          const attendee = docSnap.data();
+          
+          // Format result for direct document lookup
+          lastScanResult.value = {
+            isValid: true,
+            id: docSnap.id,
+            name: attendee.fullName || attendee.firstName + ' ' + attendee.lastName || 'Unknown',
+            email: attendee.email || '',
+            phone: attendee.phone || '',
+            registrationId: registrationId,
+            checkInStatus: attendee.checkInStatus || false,
+            checkInTime: attendee.checkInTime?.toDate() || null,
+            message: attendee.checkInStatus 
+              ? 'Attendee already checked in' 
+              : 'Attendee verified. Ready to check in.',
+            data: attendeeData
+          }
+          
+          // If auto check-in is enabled and not already checked in
+          if (!lastScanResult.value.checkInStatus) {
+            await checkInAttendee(lastScanResult.value)
+          }
+          
+          return;
+        } else {
+          console.log('Document not found in attendees collection either');
+          
+          // Also try querying attendees collection by registrationId field
+          querySnapshot = await getDocs(query(
+            collection(db, 'attendees'),
+            where('registrationId', '==', registrationId)
+          ));
+          console.log('Attendees collection query results:', querySnapshot.size);
+          
+          // If found by query, continue with that result
+          if (querySnapshot.size > 0) {
+            console.log('Found in attendees collection by registrationId field');
+          } else {
+            // Not found in either collection
+            lastScanResult.value = {
+              isValid: false,
+              message: `No registration found with ID: ${displayRegId}`,
+              registrationId: displayRegId,
+              data: attendeeData
+            }
+            return;
+          }
+        }
+      } catch (docError) {
+        console.error('Error trying to fetch document from attendees collection:', docError);
+        
+        // Try the users collection document ID approach as a last resort
+        try {
+          const docRef = doc(db, 'users', registrationId);
+          const docSnap = await getDoc(docRef);
+          
+          if (docSnap.exists()) {
+            const attendee = docSnap.data();
+            
+            // Check verification status
+            if (!attendee.isVerified) {
+              lastScanResult.value = {
+                isValid: false,
+                message: 'Registration not verified. Please complete verification process.',
+                name: attendee.name || 'Unknown',
+                email: attendee.email || '',
+                registrationId: registrationId,
+                data: attendeeData
+              }
+              return
+            }
+            
+            // Format result for direct document lookup
+            lastScanResult.value = {
+              isValid: true,
+              id: docSnap.id,
+              name: attendee.name || 'Unknown',
+              email: attendee.email || '',
+              phone: attendee.phone || '',
+              registrationId: registrationId,
+              checkInStatus: attendee.checkInStatus || false,
+              checkInTime: attendee.checkInTime?.toDate() || null,
+              message: attendee.checkInStatus 
+                ? 'Attendee already checked in' 
+                : 'Attendee verified. Ready to check in.',
+              data: attendeeData
+            }
+            
+            // If auto check-in is enabled and not already checked in
+            if (!lastScanResult.value.checkInStatus) {
+              await checkInAttendee(lastScanResult.value)
+            }
+            
+            return;
+          }
+        } catch (userDocError) {
+          console.error('Error trying to fetch document from users collection:', userDocError);
+        }
+        
+        // If we get here, no document was found
+        lastScanResult.value = {
+          isValid: false,
+          message: `No registration found with ID: ${displayRegId}`,
+          registrationId: displayRegId,
+          data: attendeeData
+        }
+        return;
       }
-      return
     }
     
-    // Get attendee data
-    const doc = querySnapshot.docs[0]
-    const attendee = doc.data()
+    // Get attendee data from the query results
+    const docSnapshot = querySnapshot.docs[0];
+    const attendee = docSnapshot.data();
     
     // Check verification status
     if (!attendee.isVerified) {
@@ -302,7 +468,7 @@ const onQrScanned = async (qrData) => {
     // Format result
     lastScanResult.value = {
       isValid: true,
-      id: doc.id,
+      id: docSnapshot.id,
       name: attendee.name || 'Unknown',
       email: attendee.email || '',
       phone: attendee.phone || '',
@@ -331,10 +497,17 @@ const checkInAttendee = async (attendee) => {
   try {
     isProcessing.value = true
     
-    const { doc, updateDoc, serverTimestamp } = await import('firebase/firestore')
+    const { doc, updateDoc, serverTimestamp, getDoc } = await import('firebase/firestore')
+    
+    // Determine which collection the attendee is from
+    const collectionName = attendee.id.startsWith('XC-') ? 'attendees' : 'users';
+    console.log(`Checking in attendee in ${collectionName} collection:`, attendee.id);
+    
+    // Create document reference
+    const docRef = doc(db, collectionName, attendee.id);
     
     // Update check-in status in database
-    await updateDoc(doc(db, 'users', attendee.id), {
+    await updateDoc(docRef, {
       checkInStatus: true,
       checkInTime: serverTimestamp(),
       checkedInBy: {
@@ -343,6 +516,22 @@ const checkInAttendee = async (attendee) => {
         timestamp: serverTimestamp()
       }
     })
+    
+    console.log(`Updated check-in status for ${attendee.id} to true`);
+    
+    // Verify the update was successful
+    try {
+      const updatedDoc = await getDoc(docRef);
+      const updatedData = updatedDoc.data();
+      console.log('Document after update:', {
+        id: updatedDoc.id,
+        checkInStatus: updatedData.checkInStatus,
+        checkInTime: updatedData.checkInTime,
+        checkedInBy: updatedData.checkedInBy
+      });
+    } catch (verifyError) {
+      console.error('Error verifying update:', verifyError);
+    }
     
     // Update local state
     attendee.checkInStatus = true
@@ -353,6 +542,7 @@ const checkInAttendee = async (attendee) => {
     new Audio('/sounds/success.mp3').play().catch(() => {})
     
     // Refresh recent check-ins
+    console.log('Refreshing recent check-ins list after check-in...');
     fetchRecentCheckins()
     
     // Update lastScanResult if this is the current scan
@@ -375,8 +565,12 @@ const undoCheckIn = async (attendee) => {
     
     const { doc, updateDoc } = await import('firebase/firestore')
     
+    // Determine which collection the attendee is from
+    const collectionName = attendee.id.startsWith('XC-') ? 'attendees' : 'users';
+    console.log(`Undoing check-in in ${collectionName} collection:`, attendee.id);
+    
     // Update check-in status in database
-    await updateDoc(doc(db, 'users', attendee.id), {
+    await updateDoc(doc(db, collectionName, attendee.id), {
       checkInStatus: false,
       checkInTime: null,
       checkedInBy: null
@@ -406,33 +600,136 @@ const undoCheckIn = async (attendee) => {
 // Fetch recent check-ins
 const fetchRecentCheckins = async () => {
   try {
+    console.log('Starting to fetch recent check-ins...');
     const { collection, query, where, orderBy, limit, getDocs } = await import('firebase/firestore')
     
-    const checkinsQuery = query(
+    // Get recent check-ins from users collection
+    const usersCheckinsQuery = query(
       collection(db, 'users'),
       where('checkInStatus', '==', true),
       orderBy('checkInTime', 'desc'),
       limit(10)
     )
     
-    const querySnapshot = await getDocs(checkinsQuery)
+    console.log('Executing users collection query...');
+    let usersSnapshot;
+    try {
+      usersSnapshot = await getDocs(usersCheckinsQuery)
+      console.log('Recent check-ins from users collection:', usersSnapshot.size);
+    } catch (userQueryError) {
+      console.error('Error querying users collection:', userQueryError);
+      
+      // If we got a missing index error, try a simpler query
+      if (userQueryError.code === 'failed-precondition') {
+        console.log('Attempting simpler query without orderBy for users...');
+        const simpleUsersQuery = query(
+          collection(db, 'users'),
+          where('checkInStatus', '==', true),
+          limit(10)
+        );
+        usersSnapshot = await getDocs(simpleUsersQuery);
+        console.log('Simple users query returned:', usersSnapshot.size, 'documents');
+      } else {
+        // Re-throw if it's not a missing index error
+        throw userQueryError;
+      }
+    }
     
-    // Map documents to checkins array
+    // Get recent check-ins from attendees collection
+    const attendeesCheckinsQuery = query(
+      collection(db, 'attendees'),
+      where('checkInStatus', '==', true),
+      orderBy('checkInTime', 'desc'),
+      limit(10)
+    )
+    
+    console.log('Executing attendees collection query...');
+    let attendeesSnapshot;
+    try {
+      attendeesSnapshot = await getDocs(attendeesCheckinsQuery)
+      console.log('Recent check-ins from attendees collection:', attendeesSnapshot.size);
+    } catch (attendeesQueryError) {
+      console.error('Error querying attendees collection:', attendeesQueryError);
+      
+      // If we got a missing index error, try a simpler query
+      if (attendeesQueryError.code === 'failed-precondition') {
+        console.log('Attempting simpler query without orderBy for attendees...');
+        const simpleAttendeesQuery = query(
+          collection(db, 'attendees'),
+          where('checkInStatus', '==', true),
+          limit(10)
+        );
+        attendeesSnapshot = await getDocs(simpleAttendeesQuery);
+        console.log('Simple attendees query returned:', attendeesSnapshot.size, 'documents');
+      } else {
+        // Re-throw if it's not a missing index error
+        throw attendeesQueryError;
+      }
+    }
+    
+    // Combine check-ins from both collections
     const checkinsList = []
-    querySnapshot.forEach(doc => {
-      const data = doc.data()
+    
+    // Add users check-ins
+    usersSnapshot.forEach(docItem => {
+      const data = docItem.data()
+      console.log('User check-in found:', docItem.id, data.name);
       
       checkinsList.push({
-        id: doc.id,
+        id: docItem.id,
         name: data.name || 'Unknown',
         email: data.email || '',
         registrationId: data.registrationId || '',
         checkInTime: data.checkInTime?.toDate() || new Date(),
-        checkedInBy: data.checkedInBy || null
+        checkedInBy: data.checkedInBy || null,
+        collection: 'users'
       })
     })
     
-    recentCheckins.value = checkinsList
+    // Add attendees check-ins
+    attendeesSnapshot.forEach(docItem => {
+      const data = docItem.data()
+      console.log('Attendee check-in found:', docItem.id, data.fullName || (data.firstName + ' ' + data.lastName));
+      
+      checkinsList.push({
+        id: docItem.id,
+        name: data.fullName || (data.firstName + ' ' + data.lastName) || 'Unknown',
+        email: data.email || '',
+        registrationId: data.registrationId || docItem.id,
+        checkInTime: data.checkInTime?.toDate() || new Date(),
+        checkedInBy: data.checkedInBy || null,
+        collection: 'attendees'
+      })
+    })
+    
+    // Sort by check-in time (newest first)
+    checkinsList.sort((a, b) => b.checkInTime - a.checkInTime)
+    
+    // Limit to 10 most recent
+    recentCheckins.value = checkinsList.slice(0, 10)
+    console.log('Final check-ins list:', recentCheckins.value.length, 'items');
+    
+    // If no check-ins found, let's check our indexes and fields
+    if (checkinsList.length === 0) {
+      // Check if we need a composite index for our query
+      console.log('No check-ins found. This could be due to:');
+      console.log('1. No attendees have been checked in yet');
+      console.log('2. checkInStatus field is not set to true');
+      console.log('3. Missing an index for the query');
+      
+      // Let's also check if any documents exist at all in these collections
+      try {
+        const basicUsersQuery = query(collection(db, 'users'), limit(2));
+        const basicUserDocs = await getDocs(basicUsersQuery);
+        console.log('Basic users query returned:', basicUserDocs.size, 'documents');
+        
+        const basicAttendeesQuery = query(collection(db, 'attendees'), limit(2));
+        const basicAttendeesDocs = await getDocs(basicAttendeesQuery);
+        console.log('Basic attendees query returned:', basicAttendeesDocs.size, 'documents');
+      } catch (err) {
+        console.error('Error checking basic collection data:', err);
+      }
+    }
   } catch (error) {
     console.error('Error fetching recent check-ins:', error)
     scannerError.value = 'Failed to fetch recent check-ins'

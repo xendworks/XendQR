@@ -140,7 +140,7 @@
                   <path fill="#4CAF50" d="M24,44c5.166,0,9.86-1.977,13.409-5.192l-6.19-5.238C29.211,35.091,26.715,36,24,36c-5.202,0-9.619-3.317-11.283-7.946l-6.522,5.025C9.505,39.556,16.227,44,24,44z"/>
                   <path fill="#1976D2" d="M43.611,20.083H42V20H24v8h11.303c-0.792,2.237-2.231,4.166-4.087,5.571c0.001-0.001,0.002-0.001,0.003-0.002l6.19,5.238C36.971,39.205,44,34,44,24C44,22.659,43.862,21.35,43.611,20.083z"/>
                 </svg>
-                Admin Sign in with Google
+                Sign in with Google
               </button>
             </div>
             
@@ -224,7 +224,29 @@
       }
       
       // Navigate to admin dashboard
-      router.push('/admin');
+      try {
+        console.log('Attempting to navigate to admin dashboard');
+        
+        // Store the successful login status in localStorage
+        localStorage.setItem('adminAuthenticated', 'true');
+        
+        // Try to use the correct path - note the spelling
+        const adminPath = '/admin/scanner';
+        
+        // Use navigate method which might be more reliable in Nuxt 3
+        await navigateTo(adminPath, { external: false });
+        
+        // If that doesn't work, fall back to window.location as a last resort
+        setTimeout(() => {
+          if (window.location.pathname !== adminPath) {
+            console.log('Navigation failed, using window.location as fallback');
+            window.location.href = adminPath;
+          }
+        }, 1000);
+      } catch (navError) {
+        console.error('Navigation error:', navError);
+        error.value = 'Could not access admin dashboard. Please try again.';
+      }
     } catch (err) {
       console.error('Login error:', err);
       error.value = typeof err === 'string' ? err : 'Failed to log in. Please check your credentials.';
@@ -253,7 +275,19 @@
       }
       
       // Navigate to admin dashboard
-      router.push('/admin');
+      try {
+        console.log('Attempting to navigate to admin dashboard after Google login');
+        console.log('Current route:', router.currentRoute.value);
+        
+        // Try alternative navigation methods
+        window.location.href = '/admin/scanner';
+        
+        // If that doesn't work, we'll never see this log
+        console.log('Navigation completed with window.location');
+      } catch (navError) {
+        console.error('Navigation error:', navError);
+        error.value = 'Could not access admin dashboard. Please try again.';
+      }
     } catch (err) {
       console.error('Google login error:', err);
       error.value = typeof err === 'string' ? err : 'Failed to log in with Google.';
