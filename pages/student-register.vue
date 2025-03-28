@@ -79,6 +79,44 @@
           <p v-if="errors.class12Marks" class="mt-1 text-sm text-red-600">{{ errors.class12Marks }}</p>
         </div>
 
+        <!-- New Field: Course Preference -->
+        <div>
+          <label for="coursePref" class="block text-sm font-medium text-gray-700">Course Preference</label>
+          <select id="coursePref" v-model="formData.coursePref" required
+            class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+            :class="{ 'border-red-500': errors.coursePref }">
+            <option value="" disabled>Select your preferred course</option>
+            <option value="computer-science">B.Tech Computer Science</option>
+            <option value="information-technology">B.Tech Information Technology</option>
+            <option value="electronics">B.Tech Electronics</option>
+            <option value="mechanical">B.Tech Mechanical</option>
+            <option value="civil">B.Tech Civil</option>
+            <option value="biotechnology">B.Tech Biotechnology</option>
+            <option value="bca">BCA</option>
+            <option value="bsc-cs">B.Sc Computer Science</option>
+            <option value="bsc-it">B.Sc Information Technology</option>
+            <option value="bba">BBA</option>
+            <option value="bcom">B.Com</option>
+            <option value="medicine">MBBS</option>
+            <option value="dentistry">BDS</option>
+            <option value="pharmacy">B.Pharm</option>
+            <option value="nursing">B.Sc Nursing</option>
+            <option value="undecided">Undecided</option>
+            <option value="other">Other</option>
+          </select>
+          <p v-if="errors.coursePref" class="mt-1 text-sm text-red-600">{{ errors.coursePref }}</p>
+        </div>
+
+        <!-- New Field: College Preference -->
+        <div>
+          <label for="collegePref" class="block text-sm font-medium text-gray-700">College Preference (if any)</label>
+          <input id="collegePref" v-model="formData.collegePref" type="text"
+            placeholder="Enter your preferred college/university (optional)"
+            class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+            :class="{ 'border-red-500': errors.collegePref }" />
+          <p v-if="errors.collegePref" class="mt-1 text-sm text-red-600">{{ errors.collegePref }}</p>
+        </div>
+
         <div class="pt-4">
           <button type="submit"
             class="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
@@ -153,6 +191,12 @@
                 <div class="uppercase text-gray-500 text-xs">Time</div>
                 <div class="font-bold">8.30 AM TO 2.30 PM</div>
               </div>
+            </div>
+
+            <!-- Course Preference -->
+            <div class="mt-3 text-sm border-t pt-3 border-gray-200">
+              <div class="uppercase text-gray-500 text-xs">Course Preference</div>
+              <div class="font-bold">{{ formattedCoursePref }}</div>
             </div>
 
             <!-- QR Code -->
@@ -236,7 +280,9 @@ const formData = reactive({
   phone: '',
   schoolName: '',
   academicGroup: '',
-  class12Marks: ''
+  class12Marks: '',
+  coursePref: '',       // New field for course preference
+  collegePref: ''       // New field for college preference
 });
 
 // Form validation errors
@@ -247,7 +293,9 @@ const errors = reactive({
   phone: '',
   schoolName: '',
   academicGroup: '',
-  class12Marks: ''
+  class12Marks: '',
+  coursePref: '',       // New field for course preference errors
+  collegePref: ''       // New field for college preference errors
 });
 
 // Format phone number as user types
@@ -302,8 +350,56 @@ const qrCodeData = computed(() => {
     email: formData.email,
     school: formData.schoolName,
     academicGroup: formData.academicGroup,
+    coursePref: formData.coursePref,
+    collegePref: formData.collegePref,
     timestamp: Date.now()
   });
+});
+
+// Computed property for formatted academic group display
+const formattedAcademicGroup = computed(() => {
+  const group = formData.academicGroup;
+  if (!group) return '';
+  
+  // Convert hyphenated values to proper display text
+  const displayMap = {
+    'computer-science': 'Computer Science',
+    'biology': 'Biology',
+    'commerce': 'Commerce',
+    'arts': 'Arts',
+    'other': 'Other'
+  };
+  
+  return displayMap[group] || group.charAt(0).toUpperCase() + group.slice(1);
+});
+
+// Computed property for formatted course preference display
+const formattedCoursePref = computed(() => {
+  const course = formData.coursePref;
+  if (!course) return '';
+  
+  // Convert hyphenated values to proper display text
+  const displayMap = {
+    'computer-science': 'B.Tech Computer Science',
+    'information-technology': 'B.Tech Information Technology',
+    'electronics': 'B.Tech Electronics',
+    'mechanical': 'B.Tech Mechanical',
+    'civil': 'B.Tech Civil',
+    'biotechnology': 'B.Tech Biotechnology',
+    'bca': 'BCA',
+    'bsc-cs': 'B.Sc Computer Science',
+    'bsc-it': 'B.Sc Information Technology',
+    'bba': 'BBA',
+    'bcom': 'B.Com',
+    'medicine': 'MBBS',
+    'dentistry': 'BDS',
+    'pharmacy': 'B.Pharm',
+    'nursing': 'B.Sc Nursing',
+    'undecided': 'Undecided',
+    'other': 'Other'
+  };
+  
+  return displayMap[course] || course.charAt(0).toUpperCase() + course.slice(1);
 });
 
 // Email validation regex
@@ -324,6 +420,8 @@ const validateForm = () => {
   errors.schoolName = '';
   errors.academicGroup = '';
   errors.class12Marks = '';
+  errors.coursePref = '';
+  errors.collegePref = '';
 
   // Validate first name
   if (!formData.firstName.trim()) {
@@ -389,6 +487,14 @@ const validateForm = () => {
     isValid = false;
   }
 
+  // Validate course preference
+  if (!formData.coursePref) {
+    errors.coursePref = 'Please select your course preference';
+    isValid = false;
+  }
+
+  // College preference is optional, so no validation needed
+
   return isValid;
 };
 
@@ -418,7 +524,9 @@ const submitRegistration = async () => {
       phone: formData.phone.replace(/\s+/g, ''),
       schoolName: formData.schoolName.trim(),
       academicGroup: formData.academicGroup,
-      mark: formData.class12Marks.toString()
+      mark: formData.class12Marks.toString(),
+      coursePref: formData.coursePref,
+      collegePref: formData.collegePref.trim()
     };
 
     await setDoc(doc(db, 'attendees', registrationId.value), attendeeData);
@@ -473,16 +581,13 @@ const resetForm = () => {
   formData.schoolName = '';
   formData.academicGroup = '';
   formData.class12Marks = '';
+  formData.coursePref = '';
+  formData.collegePref = '';
 
   isRegistered.value = false;
   error.value = '';
   registrationId.value = '';
 };
-
-// Add this computed property with the other computed properties
-const formattedAcademicGroup = computed(() => {
-  return formData.academicGroup.charAt(0).toUpperCase() + formData.academicGroup.slice(1);
-});
 
 // Initialize
 onMounted(() => {
