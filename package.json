@@ -14,7 +14,9 @@
     "postinstall": "nuxt prepare"
   },
   "dependencies": {
+    "@headlessui/vue": "^1.7.23",
     "firebase": "^10.5.2",
+    "heroicons": "^2.2.0",
     "html2canvas": "^1.4.1",
     "jsqr": "^1.4.0",
     "nuxt": "^3.8.1",

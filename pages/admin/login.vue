@@ -225,24 +225,13 @@
       
       // Navigate to admin dashboard
       try {
-        console.log('Attempting to navigate to admin dashboard');
+        console.log('Successfully authenticated as admin, redirecting to dashboard');
         
         // Store the successful login status in localStorage
         localStorage.setItem('adminAuthenticated', 'true');
         
-        // Try to use the correct path - note the spelling
-        const adminPath = '/admin/scanner';
-        
-        // Use navigate method which might be more reliable in Nuxt 3
-        await navigateTo(adminPath, { external: false });
-        
-        // If that doesn't work, fall back to window.location as a last resort
-        setTimeout(() => {
-          if (window.location.pathname !== adminPath) {
-            console.log('Navigation failed, using window.location as fallback');
-            window.location.href = adminPath;
-          }
-        }, 1000);
+        // Use direct window.location for consistent navigation
+        window.location.href = '/admin/dashboard';
       } catch (navError) {
         console.error('Navigation error:', navError);
         error.value = 'Could not access admin dashboard. Please try again.';
@@ -276,14 +265,10 @@
       
       // Navigate to admin dashboard
       try {
-        console.log('Attempting to navigate to admin dashboard after Google login');
-        console.log('Current route:', router.currentRoute.value);
+        console.log('Successfully authenticated with Google as admin, redirecting to dashboard');
         
-        // Try alternative navigation methods
-        window.location.href = '/admin/scanner';
-        
-        // If that doesn't work, we'll never see this log
-        console.log('Navigation completed with window.location');
+        // Use direct window.location for consistent navigation
+        window.location.href = '/admin/dashboard';
       } catch (navError) {
         console.error('Navigation error:', navError);
         error.value = 'Could not access admin dashboard. Please try again.';

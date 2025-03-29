@@ -150,7 +150,7 @@
       isLoading.value = true
       
       // Import Firebase sign in method
-      const { signInWithEmailAndPassword, setPersistence, browserSessionPersistence, browserLocalPersistence } = await import('firebase/auth')
+      const { signInWithEmailAndPassword, setPersistence, browserSessionPersistence, browserLocalPersistence, signOut } = await import('firebase/auth')
       
       // Set auth persistence based on remember me checkbox
       await setPersistence(auth, rememberMe.value ? browserLocalPersistence : browserSessionPersistence)
@@ -162,20 +162,23 @@
       const { getDoc, doc } = await import('firebase/firestore')
       const { db } = initializeFirebase()
       
-      const adminDoc = await getDoc(doc(db, 'admins', userCredential.user.uid))
+      // Check in the users collection with role='admin'
+      const userDoc = await getDoc(doc(db, 'users', userCredential.user.uid))
       
-      if (!adminDoc.exists()) {
-        // Sign out if not admin
-        const { signOut } = await import('firebase/auth')
+      // If user is not an admin, show error
+      if (!userDoc.exists() || userDoc.data().role !== 'admin') {
+        generalError.value = 'You do not have admin access'
         await signOut(auth)
-        
-        throw new Error('You do not have administrator privileges')
+        isLoading.value = false
+        emit('error', 'admin-access-denied')
+        return
       }
       
-      // Emit success event with user data
+      // Success - emit success event with user info
       emit('success', {
-        user: userCredential.user,
-        adminData: adminDoc.data()
+        uid: userCredential.user.uid,
+        email: userCredential.user.email,
+        displayName: userCredential.user.displayName
       })
       
       // Clear form

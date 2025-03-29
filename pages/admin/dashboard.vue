@@ -1,5 +1,5 @@
 <template>
-    <div>
+    <div class="max-w-7xl mx-auto px-4 py-8">
       <h1 class="text-2xl font-bold text-gray-900 mb-6">Admin Dashboard</h1>
       
       <!-- Stats Cards -->
@@ -19,8 +19,11 @@
                     Total Registrations
                   </dt>
                   <dd>
-                    <div class="text-lg font-medium text-gray-900">
-                      {{ isLoading ? '...' : stats.totalRegistered }}
+                    <div v-if="isLoading" class="text-lg font-medium text-gray-900">
+                      <div class="h-6 bg-gray-200 rounded animate-pulse w-16"></div>
+                    </div>
+                    <div v-else class="text-lg font-medium text-gray-900">
+                      {{ stats.totalRegistered }}
                     </div>
                   </dd>
                 </dl>
@@ -51,8 +54,11 @@
                     Checked In
                   </dt>
                   <dd>
-                    <div class="text-lg font-medium text-gray-900">
-                      {{ isLoading ? '...' : stats.totalCheckedIn }}
+                    <div v-if="isLoading" class="text-lg font-medium text-gray-900">
+                      <div class="h-6 bg-gray-200 rounded animate-pulse w-16"></div>
+                    </div>
+                    <div v-else class="text-lg font-medium text-gray-900">
+                      {{ stats.totalCheckedIn }}
                     </div>
                   </dd>
                 </dl>
@@ -83,8 +89,11 @@
                     Not Checked In
                   </dt>
                   <dd>
-                    <div class="text-lg font-medium text-gray-900">
-                      {{ isLoading ? '...' : stats.totalRegistered - stats.totalCheckedIn }}
+                    <div v-if="isLoading" class="text-lg font-medium text-gray-900">
+                      <div class="h-6 bg-gray-200 rounded animate-pulse w-16"></div>
+                    </div>
+                    <div v-else class="text-lg font-medium text-gray-900">
+                      {{ stats.totalRegistered - stats.totalCheckedIn }}
                     </div>
                   </dd>
                 </dl>
@@ -115,8 +124,11 @@
                     Check-in Rate
                   </dt>
                   <dd>
-                    <div class="text-lg font-medium text-gray-900">
-                      {{ isLoading ? '...' : `${stats.checkInRate}%` }}
+                    <div v-if="isLoading" class="text-lg font-medium text-gray-900">
+                      <div class="h-6 bg-gray-200 rounded animate-pulse w-16"></div>
+                    </div>
+                    <div v-else class="text-lg font-medium text-gray-900">
+                      {{ `${stats.checkInRate}%` }}
                     </div>
                   </dd>
                 </dl>
@@ -144,13 +156,33 @@
           
           <div class="border-t border-gray-200">
             <ul class="divide-y divide-gray-200">
-              <li v-if="isLoading" class="p-4 text-center text-gray-500">
-                Loading recent check-ins...
-              </li>
+              <!-- Skeleton loader for recent check-ins -->
+              <template v-if="isLoading">
+                <li v-for="i in 3" :key="'skeleton-' + i" class="px-4 py-4 sm:px-6">
+                  <div class="flex items-center">
+                    <div class="min-w-0 flex-1 flex items-center">
+                      <div class="flex-shrink-0">
+                        <div class="h-10 w-10 rounded-full bg-gray-200 animate-pulse"></div>
+                      </div>
+                      <div class="min-w-0 flex-1 px-4">
+                        <div>
+                          <div class="h-4 bg-gray-200 rounded animate-pulse w-32 mb-2"></div>
+                          <div class="h-3 bg-gray-200 rounded animate-pulse w-24"></div>
+                        </div>
+                      </div>
+                    </div>
+                    <div class="ml-5 flex-shrink-0">
+                      <div class="h-4 bg-gray-200 rounded animate-pulse w-16"></div>
+                    </div>
+                  </div>
+                </li>
+              </template>
+              
               <li v-else-if="recentCheckIns.length === 0" class="p-4 text-center text-gray-500">
                 No recent check-ins found
               </li>
-              <li v-for="checkin in recentCheckIns" :key="checkin.id" class="px-4 py-4 sm:px-6">
+              
+              <li v-else v-for="checkin in recentCheckIns" :key="checkin.id" class="px-4 py-4 sm:px-6">
                 <div class="flex items-center">
                   <div class="min-w-0 flex-1 flex items-center">
                     <div class="flex-shrink-0">
@@ -195,29 +227,39 @@
           
           <div class="border-t border-gray-200 px-4 py-5 sm:p-6">
             <div class="space-y-4">
-              <NuxtLink to="/admin/scanner" class="block w-full bg-indigo-600 text-white px-4 py-3 rounded-md font-medium text-center hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
-                QR Code Scanner
-              </NuxtLink>
+              <!-- Add skeleton loaders for buttons when loading -->
+              <template v-if="isLoading">
+                <div class="h-12 bg-gray-200 rounded animate-pulse w-full"></div>
+                <div class="h-12 bg-gray-200 rounded animate-pulse w-full"></div>
+                <div class="h-12 bg-gray-200 rounded animate-pulse w-full"></div>
+                <div class="h-12 bg-gray-200 rounded animate-pulse w-full"></div>
+              </template>
               
-              <NuxtLink to="/admin/attendees" class="block w-full bg-white border border-gray-300 text-gray-700 px-4 py-3 rounded-md font-medium text-center hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
-                Manage Attendees
-              </NuxtLink>
-              
-              <button 
-                @click="exportAttendeeData" 
-                class="block w-full bg-white border border-gray-300 text-gray-700 px-4 py-3 rounded-md font-medium text-center hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-                :disabled="isExporting"
-              >
-                {{ isExporting ? 'Exporting...' : 'Export Attendee Data' }}
-              </button>
-              
-              <button 
-                @click="sendBulkEmail" 
-                class="block w-full bg-white border border-gray-300 text-gray-700 px-4 py-3 rounded-md font-medium text-center hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-                :disabled="isSendingEmail"
-              >
-                {{ isSendingEmail ? 'Sending...' : 'Send Reminder Email' }}
-              </button>
+              <template v-else>
+                <NuxtLink to="/admin/scanner" class="block w-full bg-indigo-600 text-white px-4 py-3 rounded-md font-medium text-center hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+                  QR Code Scanner
+                </NuxtLink>
+                
+                <NuxtLink to="/admin/attendees" class="block w-full bg-white border border-gray-300 text-gray-700 px-4 py-3 rounded-md font-medium text-center hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+                  Manage Attendees
+                </NuxtLink>
+                
+                <button 
+                  @click="exportAttendeeData" 
+                  class="block w-full bg-white border border-gray-300 text-gray-700 px-4 py-3 rounded-md font-medium text-center hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                  :disabled="isExporting"
+                >
+                  {{ isExporting ? 'Exporting...' : 'Export Attendee Data' }}
+                </button>
+                
+                <button 
+                  @click="sendBulkEmail" 
+                  class="block w-full bg-white border border-gray-300 text-gray-700 px-4 py-3 rounded-md font-medium text-center hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                  :disabled="isSendingEmail"
+                >
+                  {{ isSendingEmail ? 'Sending...' : 'Send Reminder Email' }}
+                </button>
+              </template>
             </div>
           </div>
         </div>
@@ -256,6 +298,7 @@
   <script setup>
   import { ref, onMounted } from 'vue';
   import { useFirestore } from '../../composables/useFirestore';
+  import { initializeFirebase } from '~/firebase';
   
   // Define page meta
   definePageMeta({
@@ -305,15 +348,37 @@
   // Fetch check-in statistics
   const fetchStats = async () => {
     try {
-      // Get all registrations
-      const registrations = await getCollection('registrations');
+      console.log('Fetching stats from attendees and users collections...');
       
-      // Calculate stats
-      const totalRegistered = registrations.length;
-      const totalCheckedIn = registrations.filter(reg => reg.checkedIn).length;
+      const { collection, getDocs, query, where } = await import('firebase/firestore');
+      const { db } = initializeFirebase();
+      
+      // Get attendees from both collections
+      const attendeesSnapshot = await getDocs(collection(db, 'attendees'));
+      const usersSnapshot = await getDocs(collection(db, 'users'));
+      
+      // Convert to arrays of data
+      const attendeesList = [];
+      attendeesSnapshot.forEach(doc => {
+        attendeesList.push({ id: doc.id, ...doc.data() });
+      });
+      
+      const usersList = [];
+      usersSnapshot.forEach(doc => {
+        usersList.push({ id: doc.id, ...doc.data() });
+      });
+      
+      // Combine both lists
+      const allRegistrations = [...attendeesList, ...usersList];
+      console.log(`Found ${allRegistrations.length} total registrations (${attendeesList.length} attendees + ${usersList.length} users)`);
+      
+      const totalRegistered = allRegistrations.length;
+      const totalCheckedIn = allRegistrations.filter(reg => reg.checkInStatus).length;
       const checkInRate = totalRegistered > 0 
         ? Math.round((totalCheckedIn / totalRegistered) * 100) 
         : 0;
+      
+      console.log(`Stats calculated: ${totalRegistered} registered, ${totalCheckedIn} checked in, ${checkInRate}% rate`);
       
       stats.value = {
         totalRegistered,
@@ -329,25 +394,103 @@
   // Fetch recent check-ins
   const fetchRecentCheckIns = async () => {
     try {
-      // Create query parameters for getDocumentsByQuery (to be implemented in useFirestore)
-      const queryParams = {
-        collection: 'registrations',
-        where: [['checkedIn', '==', true]],
-        orderBy: [['checkedInTime', 'desc']],
-        limit: 10
-      };
+      console.log('Fetching recent check-ins from attendees and users collections...');
       
-      // Get recent check-ins
-      const checkIns = await getDocumentsByQuery(queryParams);
+      const { collection, query, where, orderBy, limit, getDocs } = await import('firebase/firestore');
+      const { db } = initializeFirebase();
       
-      // Transform data
-      recentCheckIns.value = checkIns.map(doc => ({
-        id: doc.id,
-        name: `${doc.firstName} ${doc.lastName}`,
-        email: doc.email || '',
-        checkInTime: doc.checkedInTime,
-        registrationId: doc.id
-      }));
+      // Get recent check-ins from users collection
+      let usersSnapshot;
+      try {
+        const usersCheckinsQuery = query(
+          collection(db, 'users'),
+          where('checkInStatus', '==', true),
+          orderBy('checkInTime', 'desc'),
+          limit(10)
+        );
+        usersSnapshot = await getDocs(usersCheckinsQuery);
+        console.log('Recent check-ins from users collection:', usersSnapshot.size);
+      } catch (userQueryError) {
+        console.error('Error querying users collection:', userQueryError);
+        
+        // If we got a missing index error, try a simpler query
+        if (userQueryError.code === 'failed-precondition') {
+          console.log('Attempting simpler query without orderBy for users...');
+          const simpleUsersQuery = query(
+            collection(db, 'users'),
+            where('checkInStatus', '==', true),
+            limit(10)
+          );
+          usersSnapshot = await getDocs(simpleUsersQuery);
+        } else {
+          // Re-throw if it's not a missing index error
+          throw userQueryError;
+        }
+      }
+      
+      // Get recent check-ins from attendees collection
+      let attendeesSnapshot;
+      try {
+        const attendeesCheckinsQuery = query(
+          collection(db, 'attendees'),
+          where('checkInStatus', '==', true),
+          orderBy('checkInTime', 'desc'),
+          limit(10)
+        );
+        attendeesSnapshot = await getDocs(attendeesCheckinsQuery);
+        console.log('Recent check-ins from attendees collection:', attendeesSnapshot.size);
+      } catch (attendeesQueryError) {
+        console.error('Error querying attendees collection:', attendeesQueryError);
+        
+        // If we got a missing index error, try a simpler query
+        if (attendeesQueryError.code === 'failed-precondition') {
+          console.log('Attempting simpler query without orderBy for attendees...');
+          const simpleAttendeesQuery = query(
+            collection(db, 'attendees'),
+            where('checkInStatus', '==', true),
+            limit(10)
+          );
+          attendeesSnapshot = await getDocs(simpleAttendeesQuery);
+        } else {
+          // Re-throw if it's not a missing index error
+          throw attendeesQueryError;
+        }
+      }
+      
+      // Combine check-ins from both collections
+      const checkinsList = [];
+      
+      // Add users check-ins
+      usersSnapshot.forEach(docItem => {
+        const data = docItem.data();
+        checkinsList.push({
+          id: docItem.id,
+          name: data.name || 'Unknown',
+          email: data.email || '',
+          checkInTime: data.checkInTime?.toDate() || new Date(),
+          registrationId: docItem.id
+        });
+      });
+      
+      // Add attendees check-ins
+      attendeesSnapshot.forEach(docItem => {
+        const data = docItem.data();
+        checkinsList.push({
+          id: docItem.id,
+          name: data.fullName || (data.firstName + ' ' + data.lastName) || 'Unknown',
+          email: data.email || '',
+          checkInTime: data.checkInTime?.toDate() || new Date(),
+          registrationId: docItem.id
+        });
+      });
+      
+      // Sort by check-in time (newest first)
+      checkinsList.sort((a, b) => b.checkInTime - a.checkInTime);
+      
+      // Limit to 10 most recent
+      recentCheckIns.value = checkinsList.slice(0, 10);
+      console.log('Final check-ins list:', recentCheckIns.value.length, 'items');
+      
     } catch (err) {
       console.error('Error fetching recent check-ins:', err);
       // Provide fallback data if query fails
@@ -362,9 +505,11 @@
       error.value = null;
       successMessage.value = null;
       
+      console.log('Refreshing dashboard data...');
       await fetchDashboardData();
       
       successMessage.value = 'Dashboard data refreshed';
+      console.log('Dashboard data successfully refreshed.');
       
       // Auto-hide success message after 3 seconds
       setTimeout(() => {
@@ -385,23 +530,96 @@
       error.value = null;
       successMessage.value = null;
       
-      // Get all registrations
-      const registrations = await getCollection('registrations');
+      console.log('Exporting attendee data from attendees and users collections...');
+      
+      const { collection, getDocs } = await import('firebase/firestore');
+      const { db } = initializeFirebase();
+      
+      // Get attendees from both collections
+      const attendeesSnapshot = await getDocs(collection(db, 'attendees'));
+      const usersSnapshot = await getDocs(collection(db, 'users'));
+      
+      // Combine data from both collections
+      const registrations = [];
+      
+      attendeesSnapshot.forEach(doc => {
+        const data = doc.data();
+        registrations.push({
+          id: doc.id,
+          firstName: data.firstName || '',
+          lastName: data.lastName || '',
+          email: data.email || '',
+          phone: data.phone || '',
+          registrationDate: data.registrationDate || data.createdAt || null,
+          checkedIn: data.checkInStatus || false,
+          checkedInTime: data.checkInTime || null
+        });
+      });
+      
+      usersSnapshot.forEach(doc => {
+        const data = doc.data();
+        // Extract first and last name from name field if available
+        let firstName = '';
+        let lastName = '';
+        if (data.name) {
+          const nameParts = data.name.split(' ');
+          firstName = nameParts[0] || '';
+          lastName = nameParts.slice(1).join(' ') || '';
+        }
+        
+        registrations.push({
+          id: doc.id,
+          firstName: data.firstName || firstName,
+          lastName: data.lastName || lastName,
+          email: data.email || '',
+          phone: data.phone || '',
+          registrationDate: data.registrationDate || data.createdAt || null,
+          checkedIn: data.checkInStatus || false,
+          checkedInTime: data.checkInTime || null
+        });
+      });
+      
+      console.log(`Preparing CSV export for ${registrations.length} attendees...`);
       
       // Prepare CSV data
       let csvContent = 'Name,Email,Phone,Registration ID,Registration Date,Check-in Status,Check-in Time\n';
       
       registrations.forEach(data => {
-        const fullName = `${data.firstName} ${data.lastName}`;
+        const fullName = `${data.firstName} ${data.lastName}`.trim();
+        
+        // Helper to safely convert Firebase timestamp or Date to string
+        const formatTimestamp = (timestamp) => {
+          if (!timestamp) return '';
+          
+          try {
+            // Check if it's a Firestore timestamp (with seconds property)
+            if (timestamp.seconds) {
+              return new Date(timestamp.seconds * 1000).toLocaleString();
+            }
+            // Check if it's a Date object
+            else if (timestamp instanceof Date) {
+              return timestamp.toLocaleString();
+            }
+            // Try to parse as a date string
+            else if (typeof timestamp === 'string') {
+              return new Date(timestamp).toLocaleString();
+            }
+            // Default fallback
+            return '';
+          } catch (err) {
+            console.error('Error formatting timestamp:', err);
+            return '';
+          }
+        };
         
         const row = [
           fullName,
           data.email || '',
           data.phone || '',
           data.id || '',
-          data.registrationDate ? new Date(data.registrationDate).toLocaleString() : '',
+          formatTimestamp(data.registrationDate),
           data.checkedIn ? 'Yes' : 'No',
-          data.checkedInTime ? new Date(data.checkedInTime).toLocaleString() : ''
+          formatTimestamp(data.checkedInTime)
         ];
         
         // Escape fields and add to CSV
@@ -426,6 +644,7 @@
       document.body.removeChild(link);
       
       successMessage.value = 'Attendee data exported successfully';
+      console.log('Attendee data export complete.');
       
       // Auto-hide success message after 3 seconds
       setTimeout(() => {

@@ -6,11 +6,11 @@
           <h3 class="text-lg font-medium text-gray-900">Attendees</h3>
           
           <div class="mt-3 sm:mt-0 sm:ml-4 flex items-center space-x-2">
-            <div class="relative rounded-md w-full sm:w-64">
+            <div class="relative rounded-md">
               <input
                 type="text"
                 v-model="searchTerm"
-                class="form-input pl-10"
+                class="form-input pl-10 w-[300px]"
                 placeholder="Search attendees..."
               />
               <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -22,11 +22,20 @@
             
             <select 
               v-model="statusFilter" 
-              class="form-input pl-3 pr-10 py-2"
+              class="form-select pl-3 pr-10 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
             >
               <option value="all">All Statuses</option>
               <option value="checked-in">Checked In</option>
               <option value="not-checked-in">Not Checked In</option>
+            </select>
+            
+            <select 
+              v-model="typeFilter" 
+              class="form-select pl-3 pr-10 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+            >
+              <option value="all">All Types</option>
+              <option value="student">Students</option>
+              <option value="consultant">Consultants</option>
             </select>
             
             <button 
@@ -41,11 +50,17 @@
           </div>
         </div>
         
-        <div class="mt-4 flex items-center text-sm text-gray-500">
-          <div class="mr-4">
+        <div class="mt-4 flex items-center text-sm text-gray-500 flex-wrap gap-4">
+          <div>
             Total: <span class="font-medium">{{ totalAttendees }}</span>
           </div>
-          <div class="mr-4">
+          <div>
+            Students: <span class="font-medium">{{ studentCount }}</span>
+          </div>
+          <div>
+            Consultants: <span class="font-medium">{{ consultantCount }}</span>
+          </div>
+          <div>
             Checked In: <span class="font-medium">{{ checkedInCount }}</span>
           </div>
           <div>
@@ -54,157 +69,426 @@
         </div>
       </div>
       
-      <!-- Attendee Table -->
-      <div class="bg-white shadow-sm overflow-hidden sm:rounded-lg">
-        <div class="overflow-x-auto">
-          <table class="min-w-full divide-y divide-gray-200">
-            <thead class="bg-gray-50">
-              <tr>
-                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Name
-                </th>
-                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Email
-                </th>
-                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Phone
-                </th>
-                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Registration Date
-                </th>
-                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Status
-                </th>
-                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Actions
-                </th>
-              </tr>
-            </thead>
-            <tbody class="bg-white divide-y divide-gray-200">
-              <tr v-if="isLoading">
-                <td colspan="6" class="px-6 py-4 text-center text-sm text-gray-500">
-                  <div class="flex justify-center">
-                    <svg class="animate-spin h-5 w-5 text-indigo-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                      <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                      <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                    </svg>
-                  </div>
-                </td>
-              </tr>
-              <tr v-else-if="filteredAttendees.length === 0">
-                <td colspan="6" class="px-6 py-4 text-center text-sm text-gray-500">
-                  No attendees found
-                </td>
-              </tr>
-              <tr v-for="attendee in filteredAttendees" :key="attendee.id" class="hover:bg-gray-50">
-                <td class="px-6 py-4 whitespace-nowrap">
-                  <div class="flex items-center">
-                    <div class="h-10 w-10 flex-shrink-0 bg-indigo-100 rounded-full flex items-center justify-center">
-                      <span class="text-indigo-700 font-medium">{{ getInitials(attendee.name) }}</span>
+      <!-- Loading State -->
+      <div v-if="isLoading" class="flex justify-center items-center py-8">
+        <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
+      </div>
+      
+      <!-- No Results -->
+      <div v-else-if="filteredAttendees.length === 0" class="bg-white p-8 text-center rounded-lg shadow-sm">
+        <p class="text-gray-500">No attendees found matching your criteria</p>
+      </div>
+      
+      <!-- All Attendees Table (when "all" is selected) -->
+      <div v-else-if="typeFilter === 'all'" class="mb-8">
+        <h3 class="text-lg font-medium text-gray-900 mb-4">All Attendees ({{ paginatedAttendees.length }} showing)</h3>
+        
+        <div class="bg-white shadow-sm overflow-hidden sm:rounded-lg">
+          <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-gray-200">
+              <thead class="bg-gray-50">
+                <tr>
+                  <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer" @click="handleSort({ key: 'registrationId', sortable: true })">
+                    <div class="flex items-center">
+                      Registration ID
+                      <span class="ml-2">
+                        <template v-if="sortConfig.key === 'registrationId'">
+                          <svg v-if="sortConfig.direction === 'asc'" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7" />
+                          </svg>
+                          <svg v-else class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                          </svg>
+                        </template>
+                      </span>
                     </div>
-                    <div class="ml-4">
-                      <div class="text-sm font-medium text-gray-900">
-                        {{ attendee.name }}
-                      </div>
-                      <div v-if="attendee.registrationId" class="text-xs text-gray-500">
-                        ID: {{ attendee.registrationId }}
-                      </div>
+                  </th>
+                  <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer" @click="handleSort({ key: 'fullName', sortable: true })">
+                    <div class="flex items-center">
+                      Name
+                      <span class="ml-2">
+                        <template v-if="sortConfig.key === 'fullName'">
+                          <svg v-if="sortConfig.direction === 'asc'" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7" />
+                          </svg>
+                          <svg v-else class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                          </svg>
+                        </template>
+                      </span>
                     </div>
-                  </div>
-                </td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                  {{ attendee.email }}
-                </td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                  {{ attendee.phone }}
-                </td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                  {{ formatDate(attendee.registrationDate) }}
-                </td>
-                <td class="px-6 py-4 whitespace-nowrap">
-                  <span 
-                    class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full"
-                    :class="attendee.checkInStatus ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'"
-                  >
-                    {{ attendee.checkInStatus ? 'Checked In' : 'Not Checked In' }}
-                  </span>
-                  <div v-if="attendee.checkInTime" class="text-xs text-gray-500 mt-1">
-                    {{ formatTime(attendee.checkInTime) }}
-                  </div>
-                </td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                  <div class="flex space-x-2">
-                    <button 
-                      @click="toggleCheckInStatus(attendee)"
-                      class="text-indigo-600 hover:text-indigo-900"
+                  </th>
+                  <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer" @click="handleSort({ key: 'email', sortable: true })">
+                    <div class="flex items-center">
+                      Email
+                      <span class="ml-2">
+                        <template v-if="sortConfig.key === 'email'">
+                          <svg v-if="sortConfig.direction === 'asc'" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7" />
+                          </svg>
+                          <svg v-else class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                          </svg>
+                        </template>
+                      </span>
+                    </div>
+                  </th>
+                  <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer" @click="handleSort({ key: 'type', sortable: true })">
+                    <div class="flex items-center">
+                      Type
+                      <span class="ml-2">
+                        <template v-if="sortConfig.key === 'type'">
+                          <svg v-if="sortConfig.direction === 'asc'" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7" />
+                          </svg>
+                          <svg v-else class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                          </svg>
+                        </template>
+                      </span>
+                    </div>
+                  </th>
+                  <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer" @click="handleSort({ key: 'checkInStatus', sortable: true })">
+                    <div class="flex items-center">
+                      Status
+                      <span class="ml-2">
+                        <template v-if="sortConfig.key === 'checkInStatus'">
+                          <svg v-if="sortConfig.direction === 'asc'" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7" />
+                          </svg>
+                          <svg v-else class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                          </svg>
+                        </template>
+                      </span>
+                    </div>
+                  </th>
+                  <th scope="col" class="relative px-6 py-3">
+                    <span class="sr-only">Actions</span>
+                  </th>
+                </tr>
+              </thead>
+              <tbody class="bg-white divide-y divide-gray-200">
+                <tr v-for="attendee in paginatedAttendees" :key="attendee.id" class="hover:bg-gray-50">
+                  <td class="px-6 py-4 whitespace-nowrap text-sm">
+                    {{ attendee.registrationId || 'N/A' }}
+                  </td>
+                  <td class="px-6 py-4 whitespace-nowrap text-sm">
+                    {{ getAttendeeName(attendee) }}
+                  </td>
+                  <td class="px-6 py-4 whitespace-nowrap text-sm">
+                    {{ attendee.email || 'N/A' }}
+                  </td>
+                  <td class="px-6 py-4 whitespace-nowrap text-sm">
+                    {{ attendee.registrationId?.startsWith('XC') ? 'Student' : 'Consultant' }}
+                  </td>
+                  <td class="px-6 py-4 whitespace-nowrap text-sm">
+                    <span 
+                      class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full"
+                      :class="attendee.checkInStatus ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'"
                     >
-                      {{ attendee.checkInStatus ? 'Undo Check-In' : 'Check In' }}
-                    </button>
-                    <button 
-                      @click="viewDetails(attendee)"
-                      class="text-gray-600 hover:text-gray-900"
-                    >
-                      View
-                    </button>
-                  </div>
-                </td>
-              </tr>
-            </tbody>
-          </table>
+                      {{ attendee.checkInStatus ? 'Checked In' : 'Not Checked In' }}
+                    </span>
+                  </td>
+                  <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                    <Menu as="div" class="relative inline-block text-left">
+                      <div>
+                        <MenuButton class="flex items-center rounded-full bg-gray-100 text-gray-400 hover:text-gray-600 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 focus:ring-offset-gray-100">
+                          <span class="sr-only">Open options</span>
+                          <EllipsisVerticalIcon class="size-5" aria-hidden="true" />
+                        </MenuButton>
+                      </div>
+
+                      <transition enter-active-class="transition ease-out duration-100" enter-from-class="transform opacity-0 scale-95" enter-to-class="transform opacity-100 scale-100" leave-active-class="transition ease-in duration-75" leave-from-class="transform opacity-100 scale-100" leave-to-class="transform opacity-0 scale-95">
+                        <MenuItems class="absolute right-0 z-10 mt-2 w-56 origin-top-right rounded-md bg-white shadow-lg ring-1 ring-black/5 focus:outline-none">
+                          <div class="py-1">
+                            <MenuItem v-slot="{ active }">
+                              <button 
+                                @click="toggleCheckInStatus(attendee)"
+                                :class="[active ? 'bg-gray-100 text-gray-900 outline-none' : 'text-gray-700', 'block w-full px-4 py-2 text-left text-sm']"
+                              >
+                                {{ attendee.checkInStatus ? 'Undo Check-In' : 'Check In' }}
+                              </button>
+                            </MenuItem>
+                            <MenuItem v-slot="{ active }">
+                              <button 
+                                @click="viewDetails(attendee)"
+                                :class="[active ? 'bg-gray-100 text-gray-900 outline-none' : 'text-gray-700', 'block w-full px-4 py-2 text-left text-sm']"
+                              >
+                                View Details
+                              </button>
+                            </MenuItem>
+                          </div>
+                        </MenuItems>
+                      </transition>
+                    </Menu>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Students Table -->
+      <div v-else-if="typeFilter === 'student'" class="mb-8">
+        <h3 class="text-lg font-medium text-gray-900 mb-4">Students ({{ studentAttendees.length }} showing)</h3>
+        
+        <!-- More detailed debug info -->
+        <div v-if="studentAttendees.length === 0" class="text-sm text-red-500 mb-4">
+          <p>No students found on current page.</p>
+          <p>Debug info:</p>
+          <ul class="list-disc pl-5">
+            <li>Total students: {{ studentCount }}</li>
+            <li>Filtered students: {{ filteredAttendees.filter(a => a.type === 'student' || (a.registrationId && a.registrationId.startsWith('XC'))).length }}</li>
+            <li>Current page: {{ currentPage }} of {{ totalPages }}</li>
+            <li>Type filter: {{ typeFilter }}</li>
+            <li>Status filter: {{ statusFilter }}</li>
+          </ul>
         </div>
         
-        <!-- Pagination -->
-        <div class="bg-white px-4 py-3 flex items-center justify-between border-t border-gray-200 sm:px-6">
-          <div class="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
-            <div>
-              <p class="text-sm text-gray-700">
-                Showing <span class="font-medium">{{ paginationStart }}</span> to <span class="font-medium">{{ paginationEnd }}</span> of <span class="font-medium">{{ totalFilteredAttendees }}</span> attendees
-              </p>
-            </div>
-            <div>
-              <nav class="relative z-0 inline-flex rounded-md shadow-sm -space-x-px" aria-label="Pagination">
+        <div v-if="studentAttendees.length > 0" class="bg-white shadow-sm overflow-hidden sm:rounded-lg">
+          <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-gray-200">
+              <thead class="bg-gray-50">
+                <tr>
+                  <th 
+                    v-for="column in studentColumns" 
+                    :key="column.key"
+                    scope="col" 
+                    class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
+                    @click="handleSort(column)"
+                  >
+                    <div class="flex items-center">
+                      {{ column.label }}
+                      <span v-if="column.sortable" class="ml-2">
+                        <template v-if="sortConfig.key === column.key">
+                          <svg v-if="sortConfig.direction === 'asc'" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7" />
+                          </svg>
+                          <svg v-else class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                          </svg>
+                        </template>
+                      </span>
+                    </div>
+                  </th>
+                  <th scope="col" class="relative px-6 py-3">
+                    <span class="sr-only">Actions</span>
+                  </th>
+                </tr>
+              </thead>
+              <tbody class="bg-white divide-y divide-gray-200">
+                <tr v-for="student in studentAttendees" :key="student.id" class="hover:bg-gray-50">
+                  <td v-for="column in studentColumns" :key="column.key" class="px-6 py-4 whitespace-nowrap text-sm">
+                    <template v-if="column.key === 'checkInStatus'">
+                      <span 
+                        class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full"
+                        :class="student.checkInStatus ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'"
+                      >
+                        {{ column.formatter ? column.formatter(student[column.key], student) : student[column.key] }}
+                      </span>
+                    </template>
+                    <template v-else>
+                      {{ column.formatter ? column.formatter(student[column.key], student) : (student[column.key] || 'N/A') }}
+                    </template>
+                  </td>
+                  <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                    <Menu as="div" class="relative inline-block text-left">
+                      <div>
+                        <MenuButton class="flex items-center rounded-full bg-gray-100 text-gray-400 hover:text-gray-600 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 focus:ring-offset-gray-100">
+                          <span class="sr-only">Open options</span>
+                        </MenuButton>
+                      </div>
+
+                      <transition enter-active-class="transition ease-out duration-100" enter-from-class="transform opacity-0 scale-95" enter-to-class="transform opacity-100 scale-100" leave-active-class="transition ease-in duration-75" leave-from-class="transform opacity-100 scale-100" leave-to-class="transform opacity-0 scale-95">
+                        <MenuItems class="absolute right-0 z-10 mt-2 w-56 origin-top-right rounded-md bg-white shadow-lg ring-1 ring-black/5 focus:outline-none">
+                          <div class="py-1">
+                            <MenuItem v-slot="{ active }">
+                              <button 
+                                @click="toggleCheckInStatus(student)"
+                                :class="[active ? 'bg-gray-100 text-gray-900 outline-none' : 'text-gray-700', 'block w-full px-4 py-2 text-left text-sm']"
+                              >
+                                {{ student.checkInStatus ? 'Undo Check-In' : 'Check In' }}
+                              </button>
+                            </MenuItem>
+                            <MenuItem v-slot="{ active }">
+                              <button 
+                                @click="viewDetails(student)"
+                                :class="[active ? 'bg-gray-100 text-gray-900 outline-none' : 'text-gray-700', 'block w-full px-4 py-2 text-left text-sm']"
+                              >
+                                View Details
+                              </button>
+                            </MenuItem>
+                          </div>
+                        </MenuItems>
+                      </transition>
+                    </Menu>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+        <div v-else class="bg-white p-8 text-center rounded-lg shadow-sm">
+          <p class="text-gray-500">No students found matching your criteria</p>
+        </div>
+      </div>
+
+      <!-- Consultants Table -->
+      <div v-if="typeFilter === 'consultant'" class="mb-8">
+        <h3 class="text-lg font-medium text-gray-900 mb-4">Consultants ({{ consultantAttendees.length }} showing)</h3>
+        
+        <!-- Debug info for consultants too -->
+        <div v-if="consultantAttendees.length === 0" class="text-sm text-red-500 mb-4">
+          <p>No consultants found on current page.</p>
+          <p>Debug info:</p>
+          <ul class="list-disc pl-5">
+            <li>Total consultants: {{ consultantCount }}</li>
+            <li>Filtered consultants: {{ filteredAttendees.filter(a => a.type === 'consultant' || (a.registrationId && a.registrationId.startsWith('ACCWA'))).length }}</li>
+            <li>Current page: {{ currentPage }} of {{ totalPages }}</li>
+            <li>Type filter: {{ typeFilter }}</li>
+            <li>Status filter: {{ statusFilter }}</li>
+          </ul>
+        </div>
+        
+        <div class="bg-white shadow-sm overflow-hidden sm:rounded-lg">
+          <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-gray-200">
+              <thead class="bg-gray-50">
+                <tr>
+                  <th 
+                    v-for="column in consultantColumns" 
+                    :key="column.key"
+                    scope="col" 
+                    class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
+                    @click="handleSort(column)"
+                  >
+                    <div class="flex items-center">
+                      {{ column.label }}
+                      <span v-if="column.sortable" class="ml-2">
+                        <template v-if="sortConfig.key === column.key">
+                          <svg v-if="sortConfig.direction === 'asc'" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7" />
+                          </svg>
+                          <svg v-else class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                          </svg>
+                        </template>
+                      </span>
+                    </div>
+                  </th>
+                  <th scope="col" class="relative px-6 py-3">
+                    <span class="sr-only">Actions</span>
+                  </th>
+                </tr>
+              </thead>
+              <tbody class="bg-white divide-y divide-gray-200">
+                <tr v-for="consultant in consultantAttendees" :key="consultant.id" class="hover:bg-gray-50">
+                  <td v-for="column in consultantColumns" :key="column.key" class="px-6 py-4 whitespace-nowrap text-sm">
+                    <template v-if="column.key === 'checkInStatus'">
+                      <span 
+                        class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full"
+                        :class="consultant.checkInStatus ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'"
+                      >
+                        {{ column.formatter ? column.formatter(consultant[column.key], consultant) : consultant[column.key] }}
+                      </span>
+                    </template>
+                    <template v-else>
+                      {{ column.formatter ? column.formatter(consultant[column.key], consultant) : (consultant[column.key] || 'N/A') }}
+                    </template>
+                  </td>
+                  <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                    <Menu as="div" class="relative inline-block text-left">
+                      <div>
+                        <MenuButton class="flex items-center rounded-full bg-gray-100 text-gray-400 hover:text-gray-600 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 focus:ring-offset-gray-100">
+                          <span class="sr-only">Open options</span>
+                          <EllipsisVerticalIcon class="size-5" aria-hidden="true" />
+                        </MenuButton>
+                      </div>
+
+                      <transition enter-active-class="transition ease-out duration-100" enter-from-class="transform opacity-0 scale-95" enter-to-class="transform opacity-100 scale-100" leave-active-class="transition ease-in duration-75" leave-from-class="transform opacity-100 scale-100" leave-to-class="transform opacity-0 scale-95">
+                        <MenuItems class="absolute right-0 z-10 mt-2 w-56 origin-top-right rounded-md bg-white shadow-lg ring-1 ring-black/5 focus:outline-none">
+                          <div class="py-1">
+                            <MenuItem v-slot="{ active }">
+                              <button 
+                                @click="toggleCheckInStatus(consultant)"
+                                :class="[active ? 'bg-gray-100 text-gray-900 outline-none' : 'text-gray-700', 'block w-full px-4 py-2 text-left text-sm']"
+                              >
+                                {{ consultant.checkInStatus ? 'Undo Check-In' : 'Check In' }}
+                              </button>
+                            </MenuItem>
+                            <MenuItem v-slot="{ active }">
+                              <button 
+                                @click="viewDetails(consultant)"
+                                :class="[active ? 'bg-gray-100 text-gray-900 outline-none' : 'text-gray-700', 'block w-full px-4 py-2 text-left text-sm']"
+                              >
+                                View Details
+                              </button>
+                            </MenuItem>
+                          </div>
+                        </MenuItems>
+                      </transition>
+                    </Menu>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Pagination -->
+      <div v-if="totalPages > 1" class="bg-white px-4 py-3 flex items-center justify-between border-t border-gray-200 sm:px-6">
+        <div class="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
+          <div>
+            <p class="text-sm text-gray-700">
+              Showing <span class="font-medium">{{ paginationStart }}</span> to <span class="font-medium">{{ paginationEnd }}</span> of <span class="font-medium">{{ totalFilteredAttendees }}</span> attendees
+            </p>
+          </div>
+          <div>
+            <nav class="relative z-0 inline-flex rounded-md shadow-sm -space-x-px" aria-label="Pagination">
+              <button
+                @click="currentPage = Math.max(1, currentPage - 1)"
+                :disabled="currentPage === 1"
+                class="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50"
+                :class="{ 'opacity-50 cursor-not-allowed': currentPage === 1 }"
+              >
+                <span class="sr-only">Previous</span>
+                <svg class="h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                  <path fill-rule="evenodd" d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z" clip-rule="evenodd" />
+                </svg>
+              </button>
+              
+              <span v-for="page in visiblePageNumbers" :key="page">
                 <button
-                  @click="currentPage = Math.max(1, currentPage - 1)"
-                  :disabled="currentPage === 1"
-                  class="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50"
-                  :class="{ 'opacity-50 cursor-not-allowed': currentPage === 1 }"
+                  v-if="page !== '...'"
+                  @click="currentPage = page"
+                  class="relative inline-flex items-center px-4 py-2 border border-gray-300 bg-white text-sm font-medium hover:bg-gray-50"
+                  :class="page === currentPage ? 'z-10 bg-indigo-50 border-indigo-500 text-indigo-600' : 'text-gray-500'"
                 >
-                  <span class="sr-only">Previous</span>
-                  <svg class="h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-                    <path fill-rule="evenodd" d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z" clip-rule="evenodd" />
-                  </svg>
+                  {{ page }}
                 </button>
-                
-                <span v-for="page in visiblePageNumbers" :key="page">
-                  <button
-                    v-if="page !== '...'"
-                    @click="currentPage = page"
-                    class="relative inline-flex items-center px-4 py-2 border border-gray-300 bg-white text-sm font-medium hover:bg-gray-50"
-                    :class="page === currentPage ? 'z-10 bg-indigo-50 border-indigo-500 text-indigo-600' : 'text-gray-500'"
-                  >
-                    {{ page }}
-                  </button>
-                  <span
-                    v-else
-                    class="relative inline-flex items-center px-4 py-2 border border-gray-300 bg-white text-sm font-medium text-gray-700"
-                  >
-                    ...
-                  </span>
+                <span
+                  v-else
+                  class="relative inline-flex items-center px-4 py-2 border border-gray-300 bg-white text-sm font-medium text-gray-700"
+                >
+                  ...
                 </span>
-                
-                <button
-                  @click="currentPage = Math.min(totalPages, currentPage + 1)"
-                  :disabled="currentPage === totalPages || totalPages === 0"
-                  class="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50"
-                  :class="{ 'opacity-50 cursor-not-allowed': currentPage === totalPages || totalPages === 0 }"
-                >
-                  <span class="sr-only">Next</span>
-                  <svg class="h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-                    <path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd" />
-                  </svg>
-                </button>
-              </nav>
-            </div>
+              </span>
+              
+              <button
+                @click="currentPage = Math.min(totalPages, currentPage + 1)"
+                :disabled="currentPage === totalPages || totalPages === 0"
+                class="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50"
+                :class="{ 'opacity-50 cursor-not-allowed': currentPage === totalPages || totalPages === 0 }"
+              >
+                <span class="sr-only">Next</span>
+                <svg class="h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                  <path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd" />
+                </svg>
+              </button>
+            </nav>
           </div>
         </div>
       </div>
@@ -229,23 +513,98 @@
           <div class="px-6 py-4">
             <div class="flex items-center mb-4">
               <div class="h-16 w-16 bg-indigo-100 rounded-full flex items-center justify-center text-xl text-indigo-700 font-bold">
-                {{ getInitials(selectedAttendee.name) }}
+                {{ getInitials(selectedAttendee.registrationId?.startsWith('XC') ? (selectedAttendee.fullName || `${selectedAttendee.firstName} ${selectedAttendee.lastName}`) : selectedAttendee.consultantName) }}
               </div>
               <div class="ml-4">
-                <h4 class="text-lg font-medium text-gray-900">{{ selectedAttendee.name }}</h4>
+                <h4 class="text-lg font-medium text-gray-900">
+                  {{ selectedAttendee.registrationId?.startsWith('XC') ? (selectedAttendee.fullName || `${selectedAttendee.firstName} ${selectedAttendee.lastName}`) : selectedAttendee.consultantName }}
+                </h4>
                 <p class="text-sm text-gray-500">Registration ID: {{ selectedAttendee.registrationId || 'N/A' }}</p>
               </div>
             </div>
             
             <div class="border-t border-gray-200 pt-4">
               <dl class="divide-y divide-gray-200">
+                <!-- Student-specific fields -->
+                <template v-if="selectedAttendee.registrationId?.startsWith('XC')">
+                  <div class="py-3 flex justify-between">
+                    <dt class="text-sm font-medium text-gray-500">Academic Group</dt>
+                    <dd class="text-sm text-gray-900">{{ selectedAttendee.academicGroup || 'N/A' }}</dd>
+                  </div>
+                  <div class="py-3 flex justify-between">
+                    <dt class="text-sm font-medium text-gray-500">Course Preference</dt>
+                    <dd class="text-sm text-gray-900">{{ selectedAttendee.coursePref || 'N/A' }}</dd>
+                  </div>
+                  <div class="py-3 flex justify-between">
+                    <dt class="text-sm font-medium text-gray-500">College Preference</dt>
+                    <dd class="text-sm text-gray-900">{{ selectedAttendee.collegePref || 'N/A' }}</dd>
+                  </div>
+                  <div class="py-3 flex justify-between">
+                    <dt class="text-sm font-medium text-gray-500">Mark</dt>
+                    <dd class="text-sm text-gray-900">{{ selectedAttendee.mark || 'N/A' }}</dd>
+                  </div>
+                  <div class="py-3 flex justify-between">
+                    <dt class="text-sm font-medium text-gray-500">School Name</dt>
+                    <dd class="text-sm text-gray-900">{{ selectedAttendee.schoolName || 'N/A' }}</dd>
+                  </div>
+                  <div class="py-3 flex justify-between">
+                    <dt class="text-sm font-medium text-gray-500">Phone</dt>
+                    <dd class="text-sm text-gray-900">{{ selectedAttendee.phone || 'N/A' }}</dd>
+                  </div>
+                </template>
+                
+                <!-- Consultant-specific fields -->
+                <template v-else>
+                  <div class="py-3 flex justify-between">
+                    <dt class="text-sm font-medium text-gray-500">Consultancy Name</dt>
+                    <dd class="text-sm text-gray-900">{{ selectedAttendee.consultancyName || 'N/A' }}</dd>
+                  </div>
+                  <div class="py-3 flex justify-between">
+                    <dt class="text-sm font-medium text-gray-500">District</dt>
+                    <dd class="text-sm text-gray-900">{{ selectedAttendee.district || 'N/A' }}</dd>
+                  </div>
+                  <div class="py-3 flex justify-between">
+                    <dt class="text-sm font-medium text-gray-500">State</dt>
+                    <dd class="text-sm text-gray-900">{{ selectedAttendee.state || 'N/A' }}</dd>
+                  </div>
+                  <div class="py-3 flex justify-between">
+                    <dt class="text-sm font-medium text-gray-500">ACCWA Member</dt>
+                    <dd class="text-sm text-gray-900">{{ selectedAttendee.accwaMember || 'No' }}</dd>
+                  </div>
+                  <div class="py-3 flex justify-between">
+                    <dt class="text-sm font-medium text-gray-500">Accommodation Required</dt>
+                    <dd class="text-sm text-gray-900">{{ selectedAttendee.accommodationRequired || 'No' }}</dd>
+                  </div>
+                  <div class="py-3 flex justify-between">
+                    <dt class="text-sm font-medium text-gray-500">Food Preference</dt>
+                    <dd class="text-sm text-gray-900">{{ selectedAttendee.foodPreference || 'N/A' }}</dd>
+                  </div>
+                  <div class="py-3 flex justify-between">
+                    <dt class="text-sm font-medium text-gray-500">Mobile Number</dt>
+                    <dd class="text-sm text-gray-900">{{ selectedAttendee.mobileNumber || 'N/A' }}</dd>
+                  </div>
+                  <div class="py-3 flex justify-between">
+                    <dt class="text-sm font-medium text-gray-500">WhatsApp Number</dt>
+                    <dd class="text-sm text-gray-900">{{ selectedAttendee.whatsappNumber || 'N/A' }}</dd>
+                  </div>
+                  <div class="py-3 flex justify-between">
+                    <dt class="text-sm font-medium text-gray-500">Office Address</dt>
+                    <dd class="text-sm text-gray-900">{{ selectedAttendee.officeAddress || 'N/A' }}</dd>
+                  </div>
+                  <div class="py-3 flex justify-between">
+                    <dt class="text-sm font-medium text-gray-500">Focusing Colleges</dt>
+                    <dd class="text-sm text-gray-900">{{ selectedAttendee.focusingColleges || 'N/A' }}</dd>
+                  </div>
+                  <div class="py-3 flex justify-between">
+                    <dt class="text-sm font-medium text-gray-500">Member Count</dt>
+                    <dd class="text-sm text-gray-900">{{ selectedAttendee.memberCount || 'N/A' }}</dd>
+                  </div>
+                </template>
+                
+                <!-- Common fields -->
                 <div class="py-3 flex justify-between">
                   <dt class="text-sm font-medium text-gray-500">Email</dt>
-                  <dd class="text-sm text-gray-900">{{ selectedAttendee.email }}</dd>
-                </div>
-                <div class="py-3 flex justify-between">
-                  <dt class="text-sm font-medium text-gray-500">Phone</dt>
-                  <dd class="text-sm text-gray-900">{{ selectedAttendee.phone }}</dd>
+                  <dd class="text-sm text-gray-900">{{ selectedAttendee.email || 'N/A' }}</dd>
                 </div>
                 <div class="py-3 flex justify-between">
                   <dt class="text-sm font-medium text-gray-500">Registration Date</dt>
@@ -265,6 +624,10 @@
                 <div v-if="selectedAttendee.checkInTime" class="py-3 flex justify-between">
                   <dt class="text-sm font-medium text-gray-500">Check-in Time</dt>
                   <dd class="text-sm text-gray-900">{{ formatDateTime(selectedAttendee.checkInTime) }}</dd>
+                </div>
+                <div v-if="selectedAttendee.checkedInBy?.adminId" class="py-3 flex justify-between">
+                  <dt class="text-sm font-medium text-gray-500">Checked In By</dt>
+                  <dd class="text-sm text-gray-900">{{ selectedAttendee.checkedInBy.adminName || selectedAttendee.checkedInBy.adminId }}</dd>
                 </div>
               </dl>
             </div>
@@ -290,9 +653,10 @@
     </div>
   </template>
   
-  <script>
-  import { ref, computed, onMounted, watch } from 'vue'
+  <script setup>
+  import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue'
   import { initializeFirebase } from '~/firebase'
+  import { Menu, MenuButton, MenuItem, MenuItems } from '@headlessui/vue'
   
   // Props definition
   const props = defineProps({
@@ -318,12 +682,146 @@
   const isLoading = ref(true)
   const searchTerm = ref('')
   const statusFilter = ref('all')
+  const typeFilter = ref('all')
   const currentPage = ref(1)
   const selectedAttendee = ref(null)
   const refreshIntervalId = ref(null)
   
   // Initialize Firebase
   const { db } = initializeFirebase()
+  
+  // Column configurations
+  const studentColumns = [
+    {
+      key: 'fullName',
+      label: 'Full Name',
+      sortable: true,
+      formatter: (value, attendee) => value || `${attendee.firstName || ''} ${attendee.lastName || ''}`.trim() || 'N/A'
+    },
+    {
+      key: 'registrationId',
+      label: 'Registration ID',
+      sortable: true
+    },
+    {
+      key: 'email',
+      label: 'Email',
+      sortable: true
+    },
+    {
+      key: 'phone',
+      label: 'Phone',
+      sortable: true
+    },
+    {
+      key: 'academicGroup',
+      label: 'Academic Group',
+      sortable: true
+    },
+    {
+      key: 'coursePref',
+      label: 'Course Preference',
+      sortable: true
+    },
+    {
+      key: 'collegePref',
+      label: 'College Preference',
+      sortable: true
+    },
+    {
+      key: 'mark',
+      label: 'Mark',
+      sortable: true
+    },
+    {
+      key: 'schoolName',
+      label: 'School Name',
+      sortable: true
+    },
+    {
+      key: 'checkInStatus',
+      label: 'Status',
+      sortable: true,
+      formatter: (value) => value ? 'Checked In' : 'Not Checked In'
+    }
+  ]
+
+  const consultantColumns = [
+    {
+      key: 'consultantName',
+      label: 'Consultant Name',
+      sortable: true
+    },
+    {
+      key: 'registrationId',
+      label: 'Registration ID',
+      sortable: true
+    },
+    {
+      key: 'consultancyName',
+      label: 'Consultancy Name',
+      sortable: true
+    },
+    {
+      key: 'email',
+      label: 'Email',
+      sortable: true
+    },
+    {
+      key: 'mobileNumber',
+      label: 'Mobile Number',
+      sortable: true
+    },
+    {
+      key: 'whatsappNumber',
+      label: 'WhatsApp Number',
+      sortable: true
+    },
+    {
+      key: 'district',
+      label: 'District',
+      sortable: true
+    },
+    {
+      key: 'state',
+      label: 'State',
+      sortable: true
+    },
+    {
+      key: 'accwaMember',
+      label: 'ACCWA Member',
+      sortable: true,
+      formatter: (value) => value || 'No'
+    },
+    {
+      key: 'accommodationRequired',
+      label: 'Accommodation',
+      sortable: true,
+      formatter: (value) => value || 'No'
+    },
+    {
+      key: 'foodPreference',
+      label: 'Food Preference',
+      sortable: true
+    },
+    {
+      key: 'memberCount',
+      label: 'Member Count',
+      sortable: true
+    },
+    {
+      key: 'checkInStatus',
+      label: 'Status',
+      sortable: true,
+      formatter: (value) => value ? 'Checked In' : 'Not Checked In'
+    }
+  ]
+
+  // Add sorting state
+  const sortConfig = ref({
+    key: '',
+    direction: 'asc'
+  })
   
   // Computed properties
   const filteredAttendees = computed(() => {
@@ -332,12 +830,36 @@
     // Apply search filter
     if (searchTerm.value.trim()) {
       const search = searchTerm.value.toLowerCase()
-      result = result.filter(attendee => 
-        attendee.name.toLowerCase().includes(search) || 
-        attendee.email.toLowerCase().includes(search) ||
-        attendee.phone.includes(search) ||
-        (attendee.registrationId && attendee.registrationId.toLowerCase().includes(search))
-      )
+      result = result.filter(attendee => {
+        // For students (XC prefix or type = student)
+        if ((attendee.type === 'student') || 
+            (attendee.registrationId && attendee.registrationId.startsWith('XC'))) {
+          return (
+            (attendee.fullName?.toLowerCase().includes(search) || 
+             attendee.firstName?.toLowerCase().includes(search) ||
+             attendee.lastName?.toLowerCase().includes(search)) ||
+            attendee.email?.toLowerCase().includes(search) ||
+            attendee.phone?.includes(search) ||
+            attendee.registrationId?.toLowerCase().includes(search) ||
+            attendee.schoolName?.toLowerCase().includes(search) ||
+            attendee.academicGroup?.toLowerCase().includes(search)
+          )
+        } 
+        // For consultants (ACCWA prefix or type = consultant)
+        else if ((attendee.type === 'consultant') || 
+                 (attendee.registrationId && attendee.registrationId.startsWith('ACCWA'))) {
+          return (
+            attendee.consultantName?.toLowerCase().includes(search) ||
+            attendee.consultancyName?.toLowerCase().includes(search) ||
+            attendee.email?.toLowerCase().includes(search) ||
+            attendee.mobileNumber?.includes(search) ||
+            attendee.registrationId?.toLowerCase().includes(search) ||
+            attendee.district?.toLowerCase().includes(search) ||
+            attendee.state?.toLowerCase().includes(search)
+          )
+        }
+        return false;
+      })
     }
     
     // Apply status filter
@@ -345,6 +867,19 @@
       result = result.filter(attendee => attendee.checkInStatus)
     } else if (statusFilter.value === 'not-checked-in') {
       result = result.filter(attendee => !attendee.checkInStatus)
+    }
+    
+    // Apply type filter
+    if (typeFilter.value === 'student') {
+      result = result.filter(attendee => 
+        (attendee.type === 'student') || 
+        (attendee.registrationId && attendee.registrationId.startsWith('XC'))
+      )
+    } else if (typeFilter.value === 'consultant') {
+      result = result.filter(attendee => 
+        (attendee.type === 'consultant') || 
+        (attendee.registrationId && attendee.registrationId.startsWith('ACCWA'))
+      )
     }
     
     return result
@@ -388,85 +923,361 @@
   const totalAttendees = computed(() => attendees.value.length)
   const checkedInCount = computed(() => attendees.value.filter(a => a.checkInStatus).length)
   const notCheckedInCount = computed(() => attendees.value.filter(a => !a.checkInStatus).length)
+  const studentCount = computed(() => attendees.value.filter(a => a.registrationId?.startsWith('XC')).length)
+  const consultantCount = computed(() => attendees.value.filter(a => a.registrationId?.startsWith('ACCWA')).length)
+  
+  // Get all filtered students before pagination to check if any exist
+  const allFilteredStudents = computed(() => {
+    return filteredAttendees.value.filter(attendee => 
+      (attendee.type === 'student') || 
+      (attendee.registrationId && attendee.registrationId.startsWith('XC'))
+    );
+  });
+  
+  // Modify the studentAttendees computed property to ensure students are shown
+  const studentAttendees = computed(() => {
+    console.log(`Computing studentAttendees: filteredAttendees length = ${filteredAttendees.value.length}, paginatedAttendees length = ${paginatedAttendees.value.length}`);
+    
+    // If we're in "all" type mode but there are no students in the current page,
+    // we need to ensure we still get some students
+    if (typeFilter.value === 'all' && paginatedAttendees.value.length > 0) {
+      const studentsInCurrentPage = paginatedAttendees.value.filter(attendee => 
+        (attendee.type === 'student') || 
+        (attendee.registrationId && attendee.registrationId.startsWith('XC'))
+      );
+      
+      console.log(`Students in current page: ${studentsInCurrentPage.length}`);
+      
+      // If there are no students in the current page but there are students overall,
+      // we'll paginate just the students
+      if (studentsInCurrentPage.length === 0 && allFilteredStudents.value.length > 0) {
+        console.log(`No students in current page but ${allFilteredStudents.value.length} students overall. Providing students directly.`);
+        
+        // Get a page of students directly
+        const start = (currentPage.value - 1) * props.itemsPerPage;
+        const end = start + props.itemsPerPage;
+        let studentsPage = allFilteredStudents.value.slice(start, Math.min(end, allFilteredStudents.value.length));
+        
+        if (sortConfig.value.key) {
+          studentsPage.sort((a, b) => {
+            const aValue = a[sortConfig.value.key];
+            const bValue = b[sortConfig.value.key];
+            
+            if (sortConfig.value.direction === 'asc') {
+              return aValue > bValue ? 1 : -1;
+            } else {
+              return aValue < bValue ? 1 : -1;
+            }
+          });
+        }
+        
+        return studentsPage;
+      }
+      
+      // Regular case - use students from current page
+      if (sortConfig.value.key) {
+        studentsInCurrentPage.sort((a, b) => {
+          const aValue = a[sortConfig.value.key];
+          const bValue = b[sortConfig.value.key];
+          
+          if (sortConfig.value.direction === 'asc') {
+            return aValue > bValue ? 1 : -1;
+          } else {
+            return aValue < bValue ? 1 : -1;
+          }
+        });
+      }
+      
+      return studentsInCurrentPage;
+    } else {
+      // For student-specific filtering, use the normal approach
+      let filtered = paginatedAttendees.value.filter(attendee => 
+        (attendee.type === 'student') || 
+        (attendee.registrationId && attendee.registrationId.startsWith('XC'))
+      );
+      
+      if (sortConfig.value.key) {
+        filtered.sort((a, b) => {
+          const aValue = a[sortConfig.value.key];
+          const bValue = b[sortConfig.value.key];
+          
+          if (sortConfig.value.direction === 'asc') {
+            return aValue > bValue ? 1 : -1;
+          } else {
+            return aValue < bValue ? 1 : -1;
+          }
+        });
+      }
+      
+      return filtered;
+    }
+  });
+
+  // Get all filtered consultants before pagination to check if any exist
+  const allFilteredConsultants = computed(() => {
+    return filteredAttendees.value.filter(attendee => 
+      (attendee.type === 'consultant') || 
+      (attendee.registrationId && attendee.registrationId.startsWith('ACCWA'))
+    );
+  });
+
+  // Modify the consultantAttendees computed property to ensure consultants are shown
+  const consultantAttendees = computed(() => {
+    console.log(`Computing consultantAttendees: filteredAttendees length = ${filteredAttendees.value.length}, paginatedAttendees length = ${paginatedAttendees.value.length}`);
+    
+    // If we're in "all" type mode but there are no consultants in the current page,
+    // we need to ensure we still get some consultants
+    if (typeFilter.value === 'all' && paginatedAttendees.value.length > 0) {
+      const consultantsInCurrentPage = paginatedAttendees.value.filter(attendee => 
+        (attendee.type === 'consultant') || 
+        (attendee.registrationId && attendee.registrationId.startsWith('ACCWA'))
+      );
+      
+      console.log(`Consultants in current page: ${consultantsInCurrentPage.length}`);
+      
+      // If there are no consultants in the current page but there are consultants overall,
+      // we'll paginate just the consultants
+      if (consultantsInCurrentPage.length === 0 && allFilteredConsultants.value.length > 0) {
+        console.log(`No consultants in current page but ${allFilteredConsultants.value.length} consultants overall. Providing consultants directly.`);
+        
+        // Get a page of consultants directly
+        const start = (currentPage.value - 1) * props.itemsPerPage;
+        const end = start + props.itemsPerPage;
+        let consultantsPage = allFilteredConsultants.value.slice(start, Math.min(end, allFilteredConsultants.value.length));
+        
+        if (sortConfig.value.key) {
+          consultantsPage.sort((a, b) => {
+            const aValue = a[sortConfig.value.key];
+            const bValue = b[sortConfig.value.key];
+            
+            if (sortConfig.value.direction === 'asc') {
+              return aValue > bValue ? 1 : -1;
+            } else {
+              return aValue < bValue ? 1 : -1;
+            }
+          });
+        }
+        
+        return consultantsPage;
+      }
+      
+      // Regular case - use consultants from current page
+      if (sortConfig.value.key) {
+        consultantsInCurrentPage.sort((a, b) => {
+          const aValue = a[sortConfig.value.key];
+          const bValue = b[sortConfig.value.key];
+          
+          if (sortConfig.value.direction === 'asc') {
+            return aValue > bValue ? 1 : -1;
+          } else {
+            return aValue < bValue ? 1 : -1;
+          }
+        });
+      }
+      
+      return consultantsInCurrentPage;
+    } else {
+      // For consultant-specific filtering, use the normal approach
+      let filtered = paginatedAttendees.value.filter(attendee => 
+        (attendee.type === 'consultant') || 
+        (attendee.registrationId && attendee.registrationId.startsWith('ACCWA'))
+      );
+      
+      if (sortConfig.value.key) {
+        filtered.sort((a, b) => {
+          const aValue = a[sortConfig.value.key];
+          const bValue = b[sortConfig.value.key];
+          
+          if (sortConfig.value.direction === 'asc') {
+            return aValue > bValue ? 1 : -1;
+          } else {
+            return aValue < bValue ? 1 : -1;
+          }
+        });
+      }
+      
+      return filtered;
+    }
+  });
+  
+  // Add sorting function for column headers
+  const handleSort = (column) => {
+    if (!column.sortable) return;
+    
+    // If clicking the same column, toggle direction
+    if (sortConfig.value.key === column.key) {
+      sortConfig.value.direction = sortConfig.value.direction === 'asc' ? 'desc' : 'asc';
+    } else {
+      // Otherwise set this column as sort key with default ascending direction
+      sortConfig.value.key = column.key;
+      sortConfig.value.direction = 'asc';
+    }
+  }
   
   // Fetch attendees from Firestore
   const fetchAttendees = async () => {
     try {
-      isLoading.value = true
+      console.log('Fetching attendees...');
+      isLoading.value = true;
       
-      const { collection, getDocs, orderBy, query } = await import('firebase/firestore')
+      const { collection, getDocs, query } = await import('firebase/firestore');
       
-      const attendeesQuery = query(
-        collection(db, 'users'),
-        orderBy('registrationDate', 'desc')
-      )
+      // Only get data from attendees collection since it contains both students and consultants
+      const attendeesQuery = query(collection(db, 'attendees'));
+      const attendeesSnapshot = await getDocs(attendeesQuery);
       
-      const querySnapshot = await getDocs(attendeesQuery)
+      console.log('AttendeesSnapshot size:', attendeesSnapshot.size);
       
-      // Map documents to attendees array
-      const attendeesList = []
-      querySnapshot.forEach(doc => {
-        const data = doc.data()
+      const attendeesList = [];
+      
+      // Process all attendees
+      attendeesSnapshot.forEach(doc => {
+        const data = doc.data();
         
-        // Convert Firestore timestamp to Date
-        const registrationDate = data.registrationDate?.toDate() || new Date()
-        const checkInTime = data.checkInTime?.toDate() || null
+        // Make sure we have a registrationId and ensure it has the correct prefix
+        let registrationId = data.registrationId || doc.id;
         
+        // Determine type based on existing type field or registration ID prefix
+        let type = data.type;
+        
+        // If type is not explicitly set, derive it from registration ID
+        if (!type) {
+          if (registrationId.startsWith('XC')) {
+            type = 'student';
+          } else if (registrationId.startsWith('ACCWA')) {
+            type = 'consultant';
+          } else {
+            // If we can't determine from existing ID, set a prefix based on data structure
+            if (data.firstName || data.lastName || data.schoolName) {
+              type = 'student';
+              if (!registrationId.startsWith('XC')) {
+                registrationId = `XC-${registrationId}`;
+              }
+            } else if (data.consultantName || data.consultancyName) {
+              type = 'consultant';
+              if (!registrationId.startsWith('ACCWA')) {
+                registrationId = `ACCWA-${registrationId}`;
+              }
+            }
+          }
+        } else {
+          // If type is explicitly set but registration ID doesn't match the type
+          if (type === 'student' && !registrationId.startsWith('XC')) {
+            registrationId = `XC-${registrationId}`;
+          } else if (type === 'consultant' && !registrationId.startsWith('ACCWA')) {
+            registrationId = `ACCWA-${registrationId}`;
+          }
+        }
+        
+        // Add each attendee with their complete data structure
         attendeesList.push({
           id: doc.id,
-          name: data.name || 'Unknown',
-          email: data.email || '',
-          phone: data.phone || '',
-          registrationId: data.registrationId || '',
-          registrationDate,
-          checkInStatus: data.checkInStatus || false,
-          checkInTime,
-          isVerified: data.isVerified || false
-        })
-      })
+          ...data,
+          // Set the cleaned up registration ID and type
+          registrationId: registrationId,
+          type: type,
+          // Convert timestamp to Date if exists
+          checkInTime: data.checkInTime?.toDate() || null,
+          // Convert timestamp in checkedInBy if exists
+          checkedInBy: data.checkedInBy ? {
+            ...data.checkedInBy,
+            timestamp: data.checkedInBy.timestamp?.toDate() || null
+          } : null
+        });
+      });
       
-      attendees.value = attendeesList
+      // Log samples for debugging
+      if (attendeesList.length > 0) {
+        const studentSample = attendeesList.find(a => a.type === 'student' || a.registrationId?.startsWith('XC'));
+        const consultantSample = attendeesList.find(a => a.type === 'consultant' || a.registrationId?.startsWith('ACCWA'));
+        
+        if (studentSample) {
+          console.log('Sample student:', studentSample);
+          console.log('Student registration ID:', studentSample.registrationId);
+        }
+        
+        if (consultantSample) {
+          console.log('Sample consultant:', consultantSample);
+          console.log('Consultant registration ID:', consultantSample.registrationId);
+        }
+      }
+      
+      // Sort by check-in time if available, otherwise by ID
+      attendeesList.sort((a, b) => {
+        if (a.checkInTime && b.checkInTime) {
+          return b.checkInTime - a.checkInTime;
+        }
+        return a.id.localeCompare(b.id);
+      });
+      
+      // Update the attendees ref with the new data
+      attendees.value = attendeesList;
+
+      // DEBUG: Log the counts for the full list
+      const studentCount = attendeesList.filter(a => a.type === 'student' || a.registrationId?.startsWith('XC')).length;
+      const consultantCount = attendeesList.filter(a => a.type === 'consultant' || a.registrationId?.startsWith('ACCWA')).length;
+      console.log(`Loaded ${attendeesList.length} total attendees (${studentCount} students, ${consultantCount} consultants)`);
+      
+      // Log the current filters (don't access computed properties yet)
+      console.log(`Current filters - Status: ${statusFilter.value}, Type: ${typeFilter.value}`);
+      
+      // The computed properties (paginatedAttendees, studentAttendees, etc.) will update automatically
+      // They should NOT be accessed here directly to avoid timing issues
+      
     } catch (error) {
-      console.error('Error fetching attendees:', error)
-      emit('error', 'Failed to fetch attendees')
+      console.error('Error fetching attendees:', error);
+      emit('error', `Failed to fetch attendees: ${error.message}`);
     } finally {
-      isLoading.value = false
+      isLoading.value = false;
     }
-  }
+  };
   
   // Toggle check-in status
   const toggleCheckInStatus = async (attendee) => {
     try {
-      const { doc, updateDoc, serverTimestamp } = await import('firebase/firestore')
+      const { doc, updateDoc, serverTimestamp } = await import('firebase/firestore');
       
-      const newStatus = !attendee.checkInStatus
+      const newStatus = !attendee.checkInStatus;
       
-      // Update Firestore
-      await updateDoc(doc(db, 'users', attendee.id), {
+      // Prepare the update data
+      const updateData = {
         checkInStatus: newStatus,
-        checkInTime: newStatus ? serverTimestamp() : null
-      })
+        checkInTime: newStatus ? serverTimestamp() : null,
+        checkedInBy: newStatus ? {
+          adminId: 'currentAdminId', // TODO: Get this from auth context
+          adminName: 'Admin', // TODO: Get this from auth context
+          timestamp: serverTimestamp()
+        } : null
+      };
+      
+      // Update Firestore - all attendees are in the 'attendees' collection
+      await updateDoc(doc(db, 'attendees', attendee.id), updateData);
       
       // Update local state
-      attendee.checkInStatus = newStatus
-      attendee.checkInTime = newStatus ? new Date() : null
+      attendee.checkInStatus = newStatus;
+      attendee.checkInTime = newStatus ? new Date() : null;
+      attendee.checkedInBy = newStatus ? {
+        adminId: 'currentAdminId', // TODO: Get this from auth context
+        adminName: 'Admin', // TODO: Get this from auth context
+        timestamp: new Date()
+      } : null;
       
       // Emit event
       if (newStatus) {
-        emit('check-in', attendee)
+        emit('check-in', attendee);
       } else {
-        emit('undo-check-in', attendee)
+        emit('undo-check-in', attendee);
       }
       
       // Update selected attendee if open
       if (selectedAttendee.value && selectedAttendee.value.id === attendee.id) {
-        selectedAttendee.value = { ...attendee }
+        selectedAttendee.value = { ...attendee };
       }
     } catch (error) {
-      console.error('Error toggling check-in status:', error)
-      emit('error', 'Failed to update check-in status')
+      console.error('Error toggling check-in status:', error);
+      emit('error', 'Failed to update check-in status');
     }
-  }
+  };
   
   // View attendee details
   const viewDetails = (attendee) => {
@@ -508,6 +1319,17 @@
       .substring(0, 2)
   }
   
+  // Helper function to get attendee name based on type
+  const getAttendeeName = (attendee) => {
+    if (attendee.registrationId?.startsWith('XC')) {
+      // Student name
+      return attendee.fullName || `${attendee.firstName || ''} ${attendee.lastName || ''}`.trim() || 'N/A';
+    } else {
+      // Consultant name
+      return attendee.consultantName || 'N/A';
+    }
+  }
+  
   // Lifecycle hooks
   onMounted(() => {
     // Fetch attendees on mount
@@ -529,7 +1351,7 @@
   })
   
   // Watch for search and filter changes to reset pagination
-  watch([searchTerm, statusFilter], () => {
+  watch([searchTerm, statusFilter, typeFilter], () => {
     currentPage.value = 1
   })
   

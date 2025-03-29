@@ -8,29 +8,35 @@ export default defineNuxtRouteMiddleware(async (to, from) => {
   // Initialize Firebase on client-side
   const { auth, db } = initializeFirebase()
   
-  // Wait for auth state to initialize
-  const user = await new Promise((resolve) => {
-    const unsubscribe = auth.onAuthStateChanged((user) => {
-      unsubscribe()
-      resolve(user)
-    })
-  })
-  
-  // If user is not authenticated, redirect to admin login
-  if (!user) {
-    return navigateTo('/admin/login')
-  }
-  
-  // Check if user is admin
   try {
+    // Wait for auth state to initialize
+    const user = await new Promise((resolve) => {
+      const unsubscribe = auth.onAuthStateChanged((user) => {
+        unsubscribe()
+        resolve(user)
+      })
+    })
+    
+    // If user is not authenticated, redirect to admin login
+    if (!user) {
+      console.log('No authenticated user, redirecting to login')
+      return navigateTo('/admin/login')
+    }
+    
+    // Check if user is admin
     const { getDoc, doc } = await import('firebase/firestore')
+    const userDoc = await getDoc(doc(db, 'users', user.uid))
     
-    const adminDoc = await getDoc(doc(db, 'admins', user.uid))
-    
-    // If user is not an admin, redirect to home
-    if (!adminDoc.exists()) {
+    // If user document doesn't exist or user is not an admin, redirect to home
+    if (!userDoc.exists() || userDoc.data().role !== 'admin') {
+      console.log('User is not an admin, redirecting to home')
       return navigateTo('/')
     }
+    
+    console.log('Admin authorization confirmed')
+    
+    // Allow navigation to proceed
+    return
   } catch (error) {
     console.error('Admin check error:', error)
     return navigateTo('/')

@@ -36,6 +36,8 @@ export function useAuth() {
     onAuthStateChanged(auth, async (authUser) => {
       if (authUser) {
         // User is signed in
+        console.log('Auth state changed: User signed in', authUser.email);
+        
         user.value = {
           uid: authUser.uid,
           email: authUser.email,
@@ -47,12 +49,14 @@ export function useAuth() {
         try {
           const userDoc = await getDoc(doc(db, 'users', authUser.uid));
           isAdmin.value = userDoc.exists() && userDoc.data().role === 'admin';
+          console.log('Admin check result:', isAdmin.value ? 'User is admin' : 'User is not admin');
         } catch (err) {
           console.error('Error checking admin status:', err);
           isAdmin.value = false;
         }
       } else {
         // User is signed out
+        console.log('Auth state changed: User signed out');
         user.value = null;
         isAdmin.value = false;
       }

@@ -236,12 +236,10 @@
       })
     })
     
-    // If not authenticated or not admin, redirect to login
-    if (!isAuthenticated.value || !isAdmin.value) {
-      // Show login form instead of redirecting
-      // router.push('/admin/login')
-    } else {
-      // Fetch admin data
+    // If not authenticated or not admin, we'll show the login form
+    // (handled by the template logic)
+    if (isAuthenticated.value && isAdmin.value) {
+      // Fetch admin data if we're authenticated as admin
       await fetchAdminData()
     }
     
@@ -279,10 +277,22 @@
     }
   }
   
-  // Handle admin login
-  const onAdminLogin = async (data) => {
-    adminData.value = data.adminData
-    await router.push('/admin')
+  // Handle successful admin login
+  const onAdminLogin = async (userData) => {
+    console.log('Admin login successful:', userData)
+    
+    // Refresh the authentication state to ensure we have latest data
+    await new Promise(resolve => {
+      const unsubscribe = watch(isLoading, (loading) => {
+        if (!loading) {
+          unsubscribe()
+          resolve()
+        }
+      })
+    })
+    
+    // Go to dashboard
+    window.location.href = '/admin/dashboard'
   }
   
   // Handle logout
